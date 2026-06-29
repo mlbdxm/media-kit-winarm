@@ -63,6 +63,21 @@ function(check_directory_exists_and_not_empty dir result_var)
   endif()
 endfunction()
 
+# ============ 下载便携版 7za.exe（用于解压 .7z）============
+
+set(SEVENZA_URL "https://www.7-zip.org/a/7za920.zip")
+set(SEVENZA_ZIP "${CMAKE_BINARY_DIR}/7za.zip")
+set(SEVENZA_EXE "${CMAKE_BINARY_DIR}/7za.exe")
+
+if(NOT EXISTS "${SEVENZA_EXE}")
+  message(STATUS "Downloading portable 7za.exe...")
+  file(DOWNLOAD "${SEVENZA_URL}" "${SEVENZA_ZIP}" SHOW_PROGRESS)
+  file(ARCHIVE_EXTRACT INPUT "${SEVENZA_ZIP}" DESTINATION "${CMAKE_BINARY_DIR}")
+  message(STATUS "7za.exe ready.")
+endif()
+
+# ============ libmpv ============
+
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
   set(LIBMPV "mpv-dev-aarch64-20260610-git-304426c.7z")
   set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
@@ -85,17 +100,17 @@ download_and_verify(
 
 check_directory_exists_and_not_empty(${LIBMPV_SRC} LIBMPV_SRC_VALID)
 
-# Extract the libmpv archive.
+# Extract the libmpv archive with 7za.exe
 if(NOT LIBMPV_SRC_VALID)
-  message(STATUS "Extracting ${LIBMPV}...")
+  message(STATUS "Extracting ${LIBMPV} with 7za.exe...")
   make_directory("${LIBMPV_SRC}")
   add_custom_target("${PROJECT_NAME}_LIBMPV_EXTRACT" ALL)
   add_custom_command(
-    TARGET "${PROJECT_NAME}_LIBMPV_EXTRACT"
-    COMMAND "${CMAKE_COMMAND}" -E tar xzf "\"${LIBMPV_ARCHIVE}\""
-    COMMAND xcopy "\"${LIBMPV_SRC}/include/mpv\"" "\"${LIBMPV_SRC}/mpv\"" /E /H /C /I
-    COMMAND rmdir "\"${LIBMPV_SRC}/include\"" /S /Q
-    COMMAND ren "\"${LIBMPV_SRC}/mpv\"" "\"include\""
+    TARGET "${PROJECT_NAME}_LIBMPV_EXTRACT" POST_BUILD
+    COMMAND "${SEVENZA_EXE}" x "${LIBMPV_ARCHIVE}" -o"${LIBMPV_SRC}" -y
+    COMMAND xcopy "${LIBMPV_SRC}/include/mpv" "${LIBMPV_SRC}/mpv" /E /H /C /I
+    COMMAND rmdir "${LIBMPV_SRC}/include" /S /Q
+    COMMAND ren "${LIBMPV_SRC}/mpv" "include"
     WORKING_DIRECTORY "${LIBMPV_SRC}"
   )
 endif()
@@ -121,14 +136,14 @@ download_and_verify(
 
 check_directory_exists_and_not_empty(${ANGLE_SRC} ANGLE_SRC_VALID)
 
-# Extract the ANGLE archive.
+# Extract the ANGLE archive with 7za.exe
 if(NOT ANGLE_SRC_VALID)
-  message(STATUS "Extracting ${ANGLE}...")
+  message(STATUS "Extracting ${ANGLE} with 7za.exe...")
   make_directory("${ANGLE_SRC}")
   add_custom_target("${PROJECT_NAME}_ANGLE_EXTRACT" ALL)
   add_custom_command(
-    TARGET "${PROJECT_NAME}_ANGLE_EXTRACT"
-    COMMAND "${CMAKE_COMMAND}" -E tar xzf "\"${ANGLE_ARCHIVE}\""
+    TARGET "${PROJECT_NAME}_ANGLE_EXTRACT" POST_BUILD
+    COMMAND "${SEVENZA_EXE}" x "${ANGLE_ARCHIVE}" -o"${ANGLE_SRC}" -y
     WORKING_DIRECTORY "${ANGLE_SRC}"
   )
 endif()
