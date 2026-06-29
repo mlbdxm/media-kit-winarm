@@ -63,7 +63,7 @@ function(check_directory_exists_and_not_empty dir result_var)
   endif()
 endfunction()
 
-# ============ 下载便携版 7za.exe（用于解压 .7z）============
+# ============ 下载便携版 7za.exe（用于解压 .7z 和 .zip）============
 
 set(SEVENZA_URL "https://www.7-zip.org/a/7za920.zip")
 set(SEVENZA_ZIP "${CMAKE_BINARY_DIR}/7za.zip")
@@ -88,7 +88,6 @@ else()
   set(LIBMPV_MD5 "497cceffc0f498c0c8745c8ec9bf32ba")
 endif()
 
-# Download location of the libmpv archive.
 set(LIBMPV_ARCHIVE "${CMAKE_BINARY_DIR}/${LIBMPV}")
 set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
 
@@ -100,7 +99,6 @@ download_and_verify(
 
 check_directory_exists_and_not_empty(${LIBMPV_SRC} LIBMPV_SRC_VALID)
 
-# Extract the libmpv archive with 7za.exe
 if(NOT LIBMPV_SRC_VALID)
   message(STATUS "Extracting ${LIBMPV} with 7za.exe...")
   make_directory("${LIBMPV_SRC}")
@@ -115,36 +113,37 @@ if(NOT LIBMPV_SRC_VALID)
   )
 endif()
 
-# ------------------------------------------------------------------------------
+# ============ ANGLE (ARM64 & x64 from mmozeiko/build-angle) ============
 
-# ANGLE archive containing the pre-built shared libraries & headers.
-set(ANGLE "ANGLE.7z")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
+  set(ANGLE "angle-arm64-2026-06-27.zip")
+  set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
+  set(ANGLE_DIR "angle-arm64")
+else()
+  set(ANGLE "angle-x64-2026-06-27.zip")
+  set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
+  set(ANGLE_DIR "angle-x64")
+endif()
 
-# Download URL & MD5 hash of the ANGLE archive.
-set(ANGLE_URL "https://github.com/alexmercerind/flutter-windows-ANGLE-OpenGL-ES/releases/download/v1.0.1/ANGLE.7z")
-set(ANGLE_MD5 "e866f13e8d552348058afaafe869b1ed")
-
-# Download location of the ANGLE archive.
 set(ANGLE_ARCHIVE "${CMAKE_BINARY_DIR}/${ANGLE}")
-set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE")
+set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE/${ANGLE_DIR}")
 
-download_and_verify(
-  ${ANGLE_URL}
-  ${ANGLE_MD5}
-  ${ANGLE_ARCHIVE}
-)
+# ANGLE 没有 MD5，直接下载（已存在则跳过）
+if(NOT EXISTS "${ANGLE_ARCHIVE}")
+  message(STATUS "Downloading ANGLE from ${ANGLE_URL}...")
+  file(DOWNLOAD "${ANGLE_URL}" "${ANGLE_ARCHIVE}" SHOW_PROGRESS)
+endif()
 
 check_directory_exists_and_not_empty(${ANGLE_SRC} ANGLE_SRC_VALID)
 
-# Extract the ANGLE archive with 7za.exe
 if(NOT ANGLE_SRC_VALID)
   message(STATUS "Extracting ${ANGLE} with 7za.exe...")
   make_directory("${ANGLE_SRC}")
   add_custom_target("${PROJECT_NAME}_ANGLE_EXTRACT" ALL)
   add_custom_command(
     TARGET "${PROJECT_NAME}_ANGLE_EXTRACT" POST_BUILD
-    COMMAND "${SEVENZA_EXE}" x "${ANGLE_ARCHIVE}" -o"${ANGLE_SRC}" -y
-    WORKING_DIRECTORY "${ANGLE_SRC}"
+    COMMAND "${SEVENZA_EXE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}/ANGLE" -y
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/ANGLE"
   )
 endif()
 
@@ -182,14 +181,12 @@ target_link_libraries(
   flutter_wrapper_plugin
 )
 
+# DLL 在新 ANGLE 包的 bin/ 目录下
 set(
   media_kit_libs_windows_video_bundled_libraries
   "${LIBMPV_SRC}/libmpv-2.dll"
-  "${ANGLE_SRC}/d3dcompiler_47.dll"
-  "${ANGLE_SRC}/libEGL.dll"
-  "${ANGLE_SRC}/libGLESv2.dll"
-  "${ANGLE_SRC}/vk_swiftshader.dll"
-  "${ANGLE_SRC}/vulkan-1.dll"
-  "${ANGLE_SRC}/zlib.dll"
+  "${ANGLE_SRC}/bin/d3dcompiler_47.dll"
+  "${ANGLE_SRC}/bin/libEGL.dll"
+  "${ANGLE_SRC}/bin/libGLESv2.dll"
   PARENT_SCOPE
 )
