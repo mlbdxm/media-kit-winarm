@@ -22,8 +22,11 @@ add_compile_definitions(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
 
 if(MEDIA_KIT_LIBS_AVAILABLE)
   include_directories(
-    "${LIBMPV_SRC}/include"
-    "${ANGLE_SRC}/include"
+  "${LIBMPV_SRC}/include"
+  "${ANGLE_SRC}/include"
+  "${ANGLE_SRC}/include/EGL"
+  "${ANGLE_SRC}/include/GLES2"
+  "${ANGLE_SRC}/include/KHR"
   )
 
   add_library(
