@@ -14,20 +14,20 @@ set(PLUGIN_NAME "media_kit_video_plugin")
 
 # This is shipped as part of package:media_kit_libs_*** package(s).
 # Must be built before this target.
-get_filename_component(LIBMPV_SRC "${CMAKE_BINARY_DIR}/../../../libmpv" ABSOLUTE)
-get_filename_component(ANGLE_SRC "${CMAKE_BINARY_DIR}/../../../ANGLE/angle-arm64" ABSOLUTE)
+set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/../../../../libmpv")
+set(ANGLE_SRC "${CMAKE_BINARY_DIR}/../../../../ANGLE/angle-arm64")
 
 # Deal with MSVC incompatiblity
 add_compile_definitions(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
 
 if(MEDIA_KIT_LIBS_AVAILABLE)
   include_directories(
-  "${LIBMPV_SRC}/include"
-  "${LIBMPV_SRC}/include/mpv"
-  "${ANGLE_SRC}/include"
-  "${ANGLE_SRC}/include/EGL"
-  "${ANGLE_SRC}/include/GLES2"
-  "${ANGLE_SRC}/include/KHR"
+    "${LIBMPV_SRC}/include"
+    "${LIBMPV_SRC}/include/mpv"
+    "${ANGLE_SRC}/include"
+    "${ANGLE_SRC}/include/EGL"
+    "${ANGLE_SRC}/include/GLES2"
+    "${ANGLE_SRC}/include/KHR"
   )
 
   add_library(
