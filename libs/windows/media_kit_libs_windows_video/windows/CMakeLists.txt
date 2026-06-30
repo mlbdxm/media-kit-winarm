@@ -63,18 +63,46 @@ function(check_directory_exists_and_not_empty dir result_var)
   endif()
 endfunction()
 
-# ============ 下载便携版 7za.exe（用于解压 .7z 和 .zip）============
+# ============ 7-Zip ============
 
-set(SEVENZA_URL "https://www.7-zip.org/a/7za920.zip")
-set(SEVENZA_ZIP "${CMAKE_BINARY_DIR}/7za.zip")
-set(SEVENZA_EXE "${CMAKE_BINARY_DIR}/7za.exe")
+# 1. 先找系统已安装的 7z
+find_program(SEVENZ_EXECUTABLE 7z
+  PATHS
+    "C:/Program Files/7-Zip"
+    "C:/Program Files (x86)/7-Zip"
+    "$ENV{ProgramFiles}/7-Zip"
+    "$ENV{ProgramFiles\(x86\)}/7-Zip"
+)
 
-if(NOT EXISTS "${SEVENZA_EXE}")
-  message(STATUS "Downloading portable 7za.exe...")
-  file(DOWNLOAD "${SEVENZA_URL}" "${SEVENZA_ZIP}" SHOW_PROGRESS)
-  file(ARCHIVE_EXTRACT INPUT "${SEVENZA_ZIP}" DESTINATION "${CMAKE_BINARY_DIR}")
-  message(STATUS "7za.exe ready.")
+# 2. 找不到则下载最新 7-Zip Extra
+if(NOT SEVENZ_EXECUTABLE)
+  set(SEVENZ_URL "https://www.7-zip.org/a/7z2409-extra.7z")
+  set(SEVENZ_ARCHIVE "${CMAKE_BINARY_DIR}/7z-extra.7z")
+  set(SEVENZ_DIR "${CMAKE_BINARY_DIR}/7z-extra")
+
+  if(NOT EXISTS "${SEVENZ_DIR}")
+    if(NOT EXISTS "${SEVENZ_ARCHIVE}")
+      message(STATUS "Downloading 7-Zip Extra from ${SEVENZ_URL}...")
+      file(DOWNLOAD "${SEVENZ_URL}" "${SEVENZ_ARCHIVE}" SHOW_PROGRESS)
+    endif()
+    message(STATUS "Extracting 7-Zip Extra...")
+    file(ARCHIVE_EXTRACT INPUT "${SEVENZ_ARCHIVE}" DESTINATION "${SEVENZ_DIR}")
+  endif()
+
+  if(EXISTS "${SEVENZ_DIR}/x64/7za.exe")
+    set(SEVENZ_EXECUTABLE "${SEVENZ_DIR}/x64/7za.exe")
+  elseif(EXISTS "${SEVENZ_DIR}/7za.exe")
+    set(SEVENZ_EXECUTABLE "${SEVENZ_DIR}/7za.exe")
+  elseif(EXISTS "${SEVENZ_DIR}/x86/7za.exe")
+    set(SEVENZ_EXECUTABLE "${SEVENZ_DIR}/x86/7za.exe")
+  endif()
 endif()
+
+if(NOT SEVENZ_EXECUTABLE)
+  message(FATAL_ERROR "7-Zip not found and auto-download failed. Install: winget install 7zip.7zip")
+endif()
+
+message(STATUS "Using 7-Zip: ${SEVENZ_EXECUTABLE}")
 
 # ============ libmpv ============
 
@@ -100,12 +128,12 @@ download_and_verify(
 check_directory_exists_and_not_empty(${LIBMPV_SRC} LIBMPV_SRC_VALID)
 
 if(NOT LIBMPV_SRC_VALID)
-  message(STATUS "Extracting ${LIBMPV} with 7za.exe...")
+  message(STATUS "Extracting ${LIBMPV}...")
   make_directory("${LIBMPV_SRC}")
   add_custom_target("${PROJECT_NAME}_LIBMPV_EXTRACT" ALL)
   add_custom_command(
     TARGET "${PROJECT_NAME}_LIBMPV_EXTRACT" POST_BUILD
-    COMMAND "${SEVENZA_EXE}" x "${LIBMPV_ARCHIVE}" -o"${LIBMPV_SRC}" -y
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" -o"${LIBMPV_SRC}" -y
     WORKING_DIRECTORY "${LIBMPV_SRC}"
   )
 endif()
@@ -125,7 +153,6 @@ endif()
 set(ANGLE_ARCHIVE "${CMAKE_BINARY_DIR}/${ANGLE}")
 set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE/${ANGLE_DIR}")
 
-# ANGLE 没有 MD5，直接下载（已存在则跳过）
 if(NOT EXISTS "${ANGLE_ARCHIVE}")
   message(STATUS "Downloading ANGLE from ${ANGLE_URL}...")
   file(DOWNLOAD "${ANGLE_URL}" "${ANGLE_ARCHIVE}" SHOW_PROGRESS)
@@ -134,12 +161,12 @@ endif()
 check_directory_exists_and_not_empty(${ANGLE_SRC} ANGLE_SRC_VALID)
 
 if(NOT ANGLE_SRC_VALID)
-  message(STATUS "Extracting ${ANGLE} with 7za.exe...")
+  message(STATUS "Extracting ${ANGLE}...")
   make_directory("${ANGLE_SRC}")
   add_custom_target("${PROJECT_NAME}_ANGLE_EXTRACT" ALL)
   add_custom_command(
     TARGET "${PROJECT_NAME}_ANGLE_EXTRACT" POST_BUILD
-    COMMAND "${SEVENZA_EXE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}/ANGLE" -y
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}/ANGLE" -y
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/ANGLE"
   )
 endif()
