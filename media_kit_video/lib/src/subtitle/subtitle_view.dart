@@ -123,8 +123,12 @@ class SubtitleViewState extends State<SubtitleView> {
       }
       final secondaryStyle =
           configuration.secondaryStyle ?? configuration.style;
-      final secondaryStrokeStyle =
-          configuration.secondaryStrokeStyle ?? configuration.strokeStyle;
+      // Fall back to the primary stroke style only when no secondary style
+      // is configured at all; an explicitly configured secondary style with
+      // a null stroke means "no stroke".
+      final secondaryStrokeStyle = configuration.secondaryStyle == null
+          ? (configuration.secondaryStrokeStyle ?? configuration.strokeStyle)
+          : configuration.secondaryStrokeStyle;
       if (first.isEmpty) {
         return line(second, secondaryStyle, secondaryStrokeStyle);
       }
