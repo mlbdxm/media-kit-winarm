@@ -94,24 +94,50 @@ class SubtitleViewState extends State<SubtitleView> {
   /// {@macro subtitle_view}
   @override
   Widget build(BuildContext context) {
-    Widget text(TextStyle style) => Text(
-          subtitle.toString(),
+    Widget text(String data, TextStyle style) => Text(
+          data,
           style: style,
           textAlign: widget.configuration.textAlign,
           textScaler: const TextScaler.linear(1),
         );
 
-    Widget subtitleView() {
-      if (widget.configuration.strokeStyle != null) {
+    Widget line(String data, TextStyle style, TextStyle? strokeStyle) {
+      if (strokeStyle != null) {
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            text(widget.configuration.strokeStyle!),
-            text(widget.configuration.style),
+            text(data, strokeStyle),
+            text(data, style),
           ],
         );
       }
-      return text(widget.configuration.style);
+      return text(data, style);
+    }
+
+    Widget subtitleView() {
+      final configuration = widget.configuration;
+      final first = subtitle.first;
+      final second = subtitle.second;
+      if (second.isEmpty) {
+        return line(first, configuration.style, configuration.strokeStyle);
+      }
+      final secondaryStyle =
+          configuration.secondaryStyle ?? configuration.style;
+      final secondaryStrokeStyle =
+          configuration.secondaryStrokeStyle ?? configuration.strokeStyle;
+      if (first.isEmpty) {
+        return line(second, secondaryStyle, secondaryStrokeStyle);
+      }
+      // The primary & the secondary subtitles are rendered as two separate
+      // [Text]s, so that each can have its own style & background.
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          line(first, configuration.style, configuration.strokeStyle),
+          SizedBox(height: configuration.spacing),
+          line(second, secondaryStyle, secondaryStrokeStyle),
+        ],
+      );
     }
 
     return AnimatedContainer(
@@ -152,6 +178,17 @@ class SubtitleViewConfiguration {
 
   final TextStyle? strokeStyle;
 
+  /// The text style to be used for the secondary subtitle.
+  /// Defaults to [style] when null.
+  final TextStyle? secondaryStyle;
+
+  /// The stroke style to be used for the secondary subtitle.
+  /// Defaults to [strokeStyle] when [secondaryStyle] is null.
+  final TextStyle? secondaryStrokeStyle;
+
+  /// The vertical gap between the primary & the secondary subtitle.
+  final double spacing;
+
   /// The text alignment to be used for the subtitles.
   final TextAlign textAlign;
 
@@ -174,6 +211,9 @@ class SubtitleViewConfiguration {
       backgroundColor: Color(0xaa000000),
     ),
     this.strokeStyle,
+    this.secondaryStyle,
+    this.secondaryStrokeStyle,
+    this.spacing = 4.0,
     this.textAlign = TextAlign.center,
     this.textScaleFactor,
     this.padding = const EdgeInsets.fromLTRB(
@@ -188,6 +228,9 @@ class SubtitleViewConfiguration {
     bool? visible,
     TextStyle? style,
     TextStyle? strokeStyle,
+    TextStyle? secondaryStyle,
+    TextStyle? secondaryStrokeStyle,
+    double? spacing,
     TextAlign? textAlign,
     double? textScaleFactor,
     EdgeInsets? padding,
@@ -196,6 +239,9 @@ class SubtitleViewConfiguration {
       visible: visible ?? this.visible,
       style: style ?? this.style,
       strokeStyle: strokeStyle ?? this.strokeStyle,
+      secondaryStyle: secondaryStyle ?? this.secondaryStyle,
+      secondaryStrokeStyle: secondaryStrokeStyle ?? this.secondaryStrokeStyle,
+      spacing: spacing ?? this.spacing,
       textAlign: textAlign ?? this.textAlign,
       textScaleFactor: textScaleFactor ?? this.textScaleFactor,
       padding: padding ?? this.padding,
@@ -214,6 +260,9 @@ class SubtitleViewConfiguration {
         other.visible == visible &&
         other.style == style &&
         other.strokeStyle == strokeStyle &&
+        other.secondaryStyle == secondaryStyle &&
+        other.secondaryStrokeStyle == secondaryStrokeStyle &&
+        other.spacing == spacing &&
         other.textAlign == textAlign &&
         other.textScaleFactor == textScaleFactor &&
         other.padding == padding;
@@ -221,5 +270,13 @@ class SubtitleViewConfiguration {
 
   @override
   int get hashCode => Object.hash(
-      visible, style, strokeStyle, textAlign, textScaleFactor, padding);
+      visible,
+      style,
+      strokeStyle,
+      secondaryStyle,
+      secondaryStrokeStyle,
+      spacing,
+      textAlign,
+      textScaleFactor,
+      padding);
 }

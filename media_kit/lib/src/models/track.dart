@@ -282,22 +282,28 @@ class Track {
   /// Currently selected subtitle track.
   final SubtitleTrack subtitle;
 
+  /// Currently selected secondary subtitle track.
+  final SubtitleTrack secondarySubtitle;
+
   /// {@macro track}
   const Track({
     this.video = const VideoTrack('auto', null, null),
     this.audio = const AudioTrack('auto', null, null),
     this.subtitle = const SubtitleTrack('auto', null, null),
+    this.secondarySubtitle = const SubtitleTrack('no', null, null),
   });
 
   Track copyWith({
     VideoTrack? video,
     AudioTrack? audio,
     SubtitleTrack? subtitle,
+    SubtitleTrack? secondarySubtitle,
   }) {
     return Track(
       video: video ?? this.video,
       audio: audio ?? this.audio,
       subtitle: subtitle ?? this.subtitle,
+      secondarySubtitle: secondarySubtitle ?? this.secondarySubtitle,
     );
   }
 
@@ -307,17 +313,18 @@ class Track {
     if (other is Track) {
       return video == other.video &&
           audio == other.audio &&
-          subtitle == other.subtitle;
+          subtitle == other.subtitle &&
+          secondarySubtitle == other.secondarySubtitle;
     }
     return false;
   }
 
   @override
-  int get hashCode => Object.hash(video, audio, subtitle);
+  int get hashCode => Object.hash(video, audio, subtitle, secondarySubtitle);
 
   @override
   String toString() =>
-      'Track(video: $video, audio: $audio, subtitle: $subtitle)';
+      'Track(video: $video, audio: $audio, subtitle: $subtitle, secondarySubtitle: $secondarySubtitle)';
 }
 
 /// {@template tracks}

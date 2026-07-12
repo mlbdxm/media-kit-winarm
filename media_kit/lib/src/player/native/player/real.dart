@@ -830,8 +830,8 @@ class NativePlayer extends PlatformPlayer {
     Future<void> function() async {
       throwIfDisposed();
 
-      // Reset existing Player.state.subtitle & Player.stream.subtitle.
-      state.subtitle = const Subtitle.raw();
+      // Reset existing primary subtitle text in Player.state.subtitle & Player.stream.subtitle.
+      state.subtitle = state.subtitle.copyWith(first: '');
       if (!subtitleController.isClosed) {
         subtitleController.add(state.subtitle);
       }
@@ -847,6 +847,92 @@ class NativePlayer extends PlatformPlayer {
       } else {
         await _setPropertyString('sid', track.id);
         state.track = state.track.copyWith(subtitle: track);
+        if (!trackController.isClosed) {
+          trackController.add(state.track);
+        }
+      }
+    }
+
+    if (synchronized) {
+      return lock.synchronized(function);
+    } else {
+      return function();
+    }
+  }
+
+  /// Sets the current secondary [SubtitleTrack] for subtitle output.
+  ///
+  /// The secondary subtitle is displayed simultaneously with the primary one,
+  /// e.g. for showing subtitles in two languages at once.
+  ///
+  /// * Currently selected secondary [SubtitleTrack] can be accessed using [state.track.secondarySubtitle] or [stream.track.secondarySubtitle].
+  /// * External subtitle track can be loaded using [SubtitleTrack.uri] constructor; it is added with the `auto` flag, so the primary selection is left untouched.
+  /// * Selecting the track which is currently the primary subtitle track is a no-op: mpv does not allow the same track to be selected as both primary & secondary.
+  /// * Pass [SubtitleTrack.no] to disable the secondary subtitle.
+  ///
+  /// ```dart
+  /// player.setSecondarySubtitleTrack(
+  ///   SubtitleTrack.uri(
+  ///     'https://www.iandevlin.com/html5test/webvtt/upc-video-subtitles-en.vtt',
+  ///     title: 'English',
+  ///     language: 'en',
+  ///   ),
+  /// );
+  /// ```
+  ///
+  @override
+  Future<void> setSecondarySubtitleTrack(
+    SubtitleTrack track, {
+    bool synchronized = true,
+  }) {
+    Future<void> function() async {
+      throwIfDisposed();
+
+      // Reset existing secondary subtitle text in Player.state.subtitle & Player.stream.subtitle.
+      state.subtitle = state.subtitle.copyWith(second: '');
+      if (!subtitleController.isClosed) {
+        subtitleController.add(state.subtitle);
+      }
+
+      if (track.uri) {
+        final existing = state.tracks.subtitle.map((e) => e.id).toSet();
+        await command([
+          'sub-add',
+          track.id,
+          'auto',
+          track.title ?? 'external',
+          track.language ?? 'auto',
+        ]);
+        // Wait for the newly added track to appear in the track-list, then
+        // select it as the secondary subtitle.
+        String? id;
+        try {
+          final tracks = await tracksController.stream
+              .firstWhere(
+                (e) => e.subtitle.any((s) => !existing.contains(s.id)),
+              )
+              .timeout(const Duration(seconds: 5));
+          id = tracks.subtitle
+              .map((e) => e.id)
+              .firstWhere((e) => !existing.contains(e));
+        } on TimeoutException {
+          for (final e in state.tracks.subtitle) {
+            if (!existing.contains(e.id)) {
+              id = e.id;
+              break;
+            }
+          }
+        }
+        if (id != null) {
+          await _setPropertyString('secondary-sid', id);
+        }
+      } else {
+        if (track.id != 'no' && track.id == state.track.subtitle.id) {
+          // mpv does not allow the same track to be selected as both primary & secondary.
+          return;
+        }
+        await _setPropertyString('secondary-sid', track.id);
+        state.track = state.track.copyWith(secondarySubtitle: track);
         if (!trackController.isClosed) {
           trackController.add(state.track);
         }
@@ -1168,6 +1254,7 @@ class NativePlayer extends PlatformPlayer {
                 VideoTrack vt = VideoTrack.no();
                 AudioTrack at = AudioTrack.no();
                 SubtitleTrack st = SubtitleTrack.no();
+                SubtitleTrack sst = SubtitleTrack.no();
 
                 final tracks = value.ref.u.list.ref;
 
@@ -1194,6 +1281,8 @@ class NativePlayer extends PlatformPlayer {
                     double? par;
                     int? audiochannels;
                     bool selected = false;
+                    // 0 = primary (sid), 1 = secondary (secondary-sid).
+                    int? mainSelection;
                     for (int j = 0; j < map.num; j++) {
                       final property = map.keys[j].toDartString();
                       switch (map.values[j].format) {
@@ -1226,6 +1315,8 @@ class NativePlayer extends PlatformPlayer {
                           switch (property) {
                             case 'id':
                               id = map.values[j].u.int64.toString();
+                            case 'main-selection':
+                              mainSelection = map.values[j].u.int64;
                             case 'demux-w':
                               w = map.values[j].u.int64;
                             case 'demux-h':
@@ -1319,12 +1410,26 @@ class NativePlayer extends PlatformPlayer {
                           selected: selected,
                         );
                         subtitle.add(track);
-                        if (selected) st = track;
+                        if (selected) {
+                          // Both the primary & the secondary subtitle tracks
+                          // have selected == true; main-selection tells them
+                          // apart (0 = sid, 1 = secondary-sid).
+                          if (mainSelection == 1) {
+                            sst = track;
+                          } else {
+                            st = track;
+                          }
+                        }
                     }
                   }
                 }
 
-                state.track = Track(video: vt, audio: at, subtitle: st);
+                state.track = Track(
+                  video: vt,
+                  audio: at,
+                  subtitle: st,
+                  secondarySubtitle: sst,
+                );
                 if (!trackController.isClosed) {
                   trackController.add(state.track);
                 }
