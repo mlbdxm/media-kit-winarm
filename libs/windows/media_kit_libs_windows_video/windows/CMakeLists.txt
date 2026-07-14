@@ -63,14 +63,59 @@ function(check_directory_exists_and_not_empty dir result_var)
   endif()
 endfunction()
 
-# libmpv archive containing the pre-built shared libraries & headers.
-set(LIBMPV "mpv-dev-x86_64-20260607-git-43b14a4.7z")
+# ============ 7-Zip ============
 
-# Download URL & MD5 hash of the libmpv archive.
-set(LIBMPV_URL "https://github.com/bggRGjQaUbCoE/mpv-winbuild-cmake/releases/download/20260607/${LIBMPV}")
-set(LIBMPV_MD5 "b84900bbc6fcb995ca6a24f62bee671f")
+# 1. 先找系统已安装的 7z
+find_program(SEVENZ_EXECUTABLE 7z
+  PATHS
+    "C:/Program Files/7-Zip"
+    "C:/Program Files (x86)/7-Zip"
+    "$ENV{ProgramFiles}/7-Zip"
+    "$ENV{ProgramFiles\(x86\)}/7-Zip"
+)
 
-# Download location of the libmpv archive.
+# 2. 找不到则下载最新 7-Zip Extra
+if(NOT SEVENZ_EXECUTABLE)
+  set(SEVENZ_URL "https://www.7-zip.org/a/7z2409-extra.7z")
+  set(SEVENZ_ARCHIVE "${CMAKE_BINARY_DIR}/7z-extra.7z")
+  set(SEVENZ_DIR "${CMAKE_BINARY_DIR}/7z-extra")
+
+  if(NOT EXISTS "${SEVENZ_DIR}")
+    if(NOT EXISTS "${SEVENZ_ARCHIVE}")
+      message(STATUS "Downloading 7-Zip Extra from ${SEVENZ_URL}...")
+      file(DOWNLOAD "${SEVENZ_URL}" "${SEVENZ_ARCHIVE}" SHOW_PROGRESS)
+    endif()
+    message(STATUS "Extracting 7-Zip Extra...")
+    file(ARCHIVE_EXTRACT INPUT "${SEVENZ_ARCHIVE}" DESTINATION "${SEVENZ_DIR}")
+  endif()
+
+  if(EXISTS "${SEVENZ_DIR}/x64/7za.exe")
+    set(SEVENZ_EXECUTABLE "${SEVENZ_DIR}/x64/7za.exe")
+  elseif(EXISTS "${SEVENZ_DIR}/7za.exe")
+    set(SEVENZ_EXECUTABLE "${SEVENZ_DIR}/7za.exe")
+  elseif(EXISTS "${SEVENZ_DIR}/x86/7za.exe")
+    set(SEVENZ_EXECUTABLE "${SEVENZ_DIR}/x86/7za.exe")
+  endif()
+endif()
+
+if(NOT SEVENZ_EXECUTABLE)
+  message(FATAL_ERROR "7-Zip not found and auto-download failed. Install: winget install 7zip.7zip")
+endif()
+
+message(STATUS "Using 7-Zip: ${SEVENZ_EXECUTABLE}")
+
+# ============ libmpv ============
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
+  set(LIBMPV "mpv-dev-aarch64-20260610-git-304426c.7z")
+  set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
+  set(LIBMPV_MD5 "fd3099a41b51c643dd64e93958ada7e6")
+else()
+  set(LIBMPV "mpv-dev-x86_64-v3-20260610-git-304426c.7z")
+  set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
+  set(LIBMPV_MD5 "497cceffc0f498c0c8745c8ec9bf32ba")
+endif()
+
 set(LIBMPV_ARCHIVE "${CMAKE_BINARY_DIR}/${LIBMPV}")
 set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
 
@@ -82,51 +127,47 @@ download_and_verify(
 
 check_directory_exists_and_not_empty(${LIBMPV_SRC} LIBMPV_SRC_VALID)
 
-# Extract the libmpv archive.
 if(NOT LIBMPV_SRC_VALID)
   message(STATUS "Extracting ${LIBMPV}...")
   make_directory("${LIBMPV_SRC}")
   add_custom_target("${PROJECT_NAME}_LIBMPV_EXTRACT" ALL)
   add_custom_command(
-    TARGET "${PROJECT_NAME}_LIBMPV_EXTRACT"
-    COMMAND "${CMAKE_COMMAND}" -E tar xzf "\"${LIBMPV_ARCHIVE}\""
-    COMMAND xcopy "\"${LIBMPV_SRC}/include/mpv\"" "\"${LIBMPV_SRC}/mpv\"" /E /H /C /I
-    COMMAND rmdir "\"${LIBMPV_SRC}/include\"" /S /Q
-    COMMAND ren "\"${LIBMPV_SRC}/mpv\"" "\"include\""
+    TARGET "${PROJECT_NAME}_LIBMPV_EXTRACT" POST_BUILD
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" -o"${LIBMPV_SRC}" -y
     WORKING_DIRECTORY "${LIBMPV_SRC}"
   )
 endif()
 
-# ------------------------------------------------------------------------------
+# ============ ANGLE (ARM64 & x64 from mmozeiko/build-angle) ============
 
-# ANGLE archive containing the pre-built shared libraries & headers.
-set(ANGLE "ANGLE.7z")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
+  set(ANGLE "angle-arm64-2026-06-27.zip")
+  set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
+  set(ANGLE_DIR "angle-arm64")
+else()
+  set(ANGLE "angle-x64-2026-06-27.zip")
+  set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
+  set(ANGLE_DIR "angle-x64")
+endif()
 
-# Download URL & MD5 hash of the ANGLE archive.
-set(ANGLE_URL "https://github.com/alexmercerind/flutter-windows-ANGLE-OpenGL-ES/releases/download/v1.0.1/ANGLE.7z")
-set(ANGLE_MD5 "e866f13e8d552348058afaafe869b1ed")
-
-# Download location of the ANGLE archive.
 set(ANGLE_ARCHIVE "${CMAKE_BINARY_DIR}/${ANGLE}")
-set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE")
+set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE/${ANGLE_DIR}")
 
-download_and_verify(
-  ${ANGLE_URL}
-  ${ANGLE_MD5}
-  ${ANGLE_ARCHIVE}
-)
+if(NOT EXISTS "${ANGLE_ARCHIVE}")
+  message(STATUS "Downloading ANGLE from ${ANGLE_URL}...")
+  file(DOWNLOAD "${ANGLE_URL}" "${ANGLE_ARCHIVE}" SHOW_PROGRESS)
+endif()
 
 check_directory_exists_and_not_empty(${ANGLE_SRC} ANGLE_SRC_VALID)
 
-# Extract the ANGLE archive.
 if(NOT ANGLE_SRC_VALID)
   message(STATUS "Extracting ${ANGLE}...")
   make_directory("${ANGLE_SRC}")
   add_custom_target("${PROJECT_NAME}_ANGLE_EXTRACT" ALL)
   add_custom_command(
-    TARGET "${PROJECT_NAME}_ANGLE_EXTRACT"
-    COMMAND "${CMAKE_COMMAND}" -E tar xzf "\"${ANGLE_ARCHIVE}\""
-    WORKING_DIRECTORY "${ANGLE_SRC}"
+    TARGET "${PROJECT_NAME}_ANGLE_EXTRACT" POST_BUILD
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}/ANGLE" -y
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/ANGLE"
   )
 endif()
 
@@ -164,14 +205,12 @@ target_link_libraries(
   flutter_wrapper_plugin
 )
 
+# DLL 在新 ANGLE 包的 bin/ 目录下
 set(
   media_kit_libs_windows_video_bundled_libraries
   "${LIBMPV_SRC}/libmpv-2.dll"
-  "${ANGLE_SRC}/d3dcompiler_47.dll"
-  "${ANGLE_SRC}/libEGL.dll"
-  "${ANGLE_SRC}/libGLESv2.dll"
-  "${ANGLE_SRC}/vk_swiftshader.dll"
-  "${ANGLE_SRC}/vulkan-1.dll"
-  "${ANGLE_SRC}/zlib.dll"
+  "${ANGLE_SRC}/bin/d3dcompiler_47.dll"
+  "${ANGLE_SRC}/bin/libEGL.dll"
+  "${ANGLE_SRC}/bin/libGLESv2.dll"
   PARENT_SCOPE
 )
