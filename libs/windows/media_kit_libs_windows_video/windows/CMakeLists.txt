@@ -127,16 +127,23 @@ download_and_verify(
 
 check_directory_exists_and_not_empty(${LIBMPV_SRC} LIBMPV_SRC_VALID)
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
+  set(LIBMPV_DIR "mpv-dev-aarch64-20260610-git-304426c")
+else()
+  set(LIBMPV_DIR "mpv-dev-x86_64-v3-20260610-git-304426c")
+endif()
+check_directory_exists_and_not_empty(${LIBMPV_SRC} LIBMPV_SRC_VALID)
 if(NOT LIBMPV_SRC_VALID)
   message(STATUS "Extracting ${LIBMPV}...")
-  make_directory("${LIBMPV_SRC}")
   add_custom_target("${PROJECT_NAME}_LIBMPV_EXTRACT" ALL)
   add_custom_command(
     TARGET "${PROJECT_NAME}_LIBMPV_EXTRACT" POST_BUILD
-    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" -o"${LIBMPV_SRC}" -y
-    WORKING_DIRECTORY "${LIBMPV_SRC}"
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" -o"${CMAKE_BINARY_DIR}" -y
+    COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}" "${LIBMPV_SRC}"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
 endif()
+
 
 # ============ ANGLE (ARM64 & x64 from mmozeiko/build-angle) ============
 
@@ -151,7 +158,7 @@ else()
 endif()
 
 set(ANGLE_ARCHIVE "${CMAKE_BINARY_DIR}/${ANGLE}")
-set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE/${ANGLE_DIR}")
+set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE")
 
 if(NOT EXISTS "${ANGLE_ARCHIVE}")
   message(STATUS "Downloading ANGLE from ${ANGLE_URL}...")
@@ -162,12 +169,12 @@ check_directory_exists_and_not_empty(${ANGLE_SRC} ANGLE_SRC_VALID)
 
 if(NOT ANGLE_SRC_VALID)
   message(STATUS "Extracting ${ANGLE}...")
-  make_directory("${ANGLE_SRC}")
   add_custom_target("${PROJECT_NAME}_ANGLE_EXTRACT" ALL)
   add_custom_command(
     TARGET "${PROJECT_NAME}_ANGLE_EXTRACT" POST_BUILD
-    COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}/ANGLE" -y
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/ANGLE"
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}" -y
+    COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_BINARY_DIR}/${ANGLE_DIR}" "${ANGLE_SRC}"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
 endif()
 
