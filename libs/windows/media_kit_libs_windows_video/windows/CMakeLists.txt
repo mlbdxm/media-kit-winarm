@@ -110,35 +110,29 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
   set(LIBMPV "mpv-dev-aarch64-20260610-git-304426c.7z")
   set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
   set(LIBMPV_MD5 "fd3099a41b51c643dd64e93958ada7e6")
+  set(LIBMPV_DIR "mpv-dev-aarch64-20260610-git-304426c")
 else()
   set(LIBMPV "mpv-dev-x86_64-v3-20260610-git-304426c.7z")
   set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
   set(LIBMPV_MD5 "497cceffc0f498c0c8745c8ec9bf32ba")
-endif()
-
-set(LIBMPV_ARCHIVE "${CMAKE_BINARY_DIR}/${LIBMPV}")
-set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
-
-download_and_verify(
-  ${LIBMPV_URL}
-  ${LIBMPV_MD5}
-  ${LIBMPV_ARCHIVE}
-)
-
-check_directory_exists_and_not_empty(${LIBMPV_SRC} LIBMPV_SRC_VALID)
-
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
-  set(LIBMPV_DIR "mpv-dev-aarch64-20260610-git-304426c")
-else()
   set(LIBMPV_DIR "mpv-dev-x86_64-v3-20260610-git-304426c")
 endif()
+set(LIBMPV_ARCHIVE "${CMAKE_BINARY_DIR}/${LIBMPV}")
+set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
+download_and_verify(${LIBMPV_URL} ${LIBMPV_MD5} ${LIBMPV_ARCHIVE})
 check_directory_exists_and_not_empty(${LIBMPV_SRC} LIBMPV_SRC_VALID)
 if(NOT LIBMPV_SRC_VALID)
   message(STATUS "Extracting ${LIBMPV}...")
   add_custom_target("${PROJECT_NAME}_LIBMPV_EXTRACT" ALL)
   add_custom_command(
     TARGET "${PROJECT_NAME}_LIBMPV_EXTRACT" POST_BUILD
+    # 第1步：解压到 CMAKE_BINARY_DIR → 产生 ${LIBMPV_DIR}/
     COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" -o"${CMAKE_BINARY_DIR}" -y
+    # 第2步：把 include/mpv/* 拷贝到 include/ （消除 mpv/ 这一层）
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}/include/mpv"
+      "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}/include"
+    # 第3步：重命名 ${LIBMPV_DIR} → libmpv
     COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}" "${LIBMPV_SRC}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
@@ -168,14 +162,13 @@ if(NOT ANGLE_SRC_VALID)
   add_custom_target("${PROJECT_NAME}_ANGLE_EXTRACT" ALL)
   add_custom_command(
     TARGET "${PROJECT_NAME}_ANGLE_EXTRACT" POST_BUILD
-    # Step 1: Extract zip to CMAKE_BINARY_DIR → creates ${ANGLE_DIR}/
+    # 第1步：解压到 CMAKE_BINARY_DIR → 产生 ${ANGLE_DIR}/（如 angle-arm64/）
     COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}" -y
-    # Step 2: Rename ${ANGLE_DIR} → ANGLE
+    # 第2步：重命名 ${ANGLE_DIR} → ANGLE（消除 angle-arm64/ 这一层）
     COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_BINARY_DIR}/${ANGLE_DIR}" "${ANGLE_SRC}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
 endif()
-
 
 # ------------------------------------------------------------------------------
 set(PLUGIN_NAME "media_kit_libs_windows_video_plugin")
@@ -220,4 +213,5 @@ set(
   "${ANGLE_SRC}/bin/libGLESv2.dll"
   PARENT_SCOPE
 )
+
 
