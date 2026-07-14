@@ -25,6 +25,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     # Include libmpv headers & link to the library.
     include_directories(
       "${LIBMPV_SRC}/include"
+      "${LIBMPV_SRC}/include/mpv"
     )
     target_link_libraries(
       ${TARGET_NAME} PRIVATE
@@ -106,8 +107,6 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Android")
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../libmpv/src/main/jniLibs/${ANDROID_ABI}/libmpv.so"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../libmpv/src/main/jniLibs/${ANDROID_ABI}/libmediakitandroidhelper.so"
   )
-
-  target_link_options(${TARGET_NAME} PRIVATE "-Wl,-z,max-page-size=16384")
 
   # Additional options.
   set_target_properties(
