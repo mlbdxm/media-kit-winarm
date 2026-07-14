@@ -38,8 +38,6 @@ function(download_and_verify url md5 locationForArchive)
 endfunction()
 
 # ==============================================================================
-# 7-Zip
-# ==============================================================================
 find_program(SEVENZ_EXECUTABLE NAMES 7z 7za
   PATHS
     "C:/Program Files/7-Zip"
@@ -54,26 +52,19 @@ message(STATUS "7-Zip: ${SEVENZ_EXECUTABLE}")
 
 # ==============================================================================
 # libmpv — shinchiro/mpv-winbuild-cmake
-#
-# 7z 包结构（有顶层目录）：
-#   mpv-dev-aarch64-20260610-git-304426c/
-#     include/
-#       mpv/
-#         client.h, render.h, render_gl.h, stream_cb.h
-#     libmpv-2.dll
-#     libmpv.dll.a
+# 7z 包结构（有顶层目录 mpv-dev-aarch64-.../）：
+#   include/mpv/client.h, render.h, render_gl.h, stream_cb.h
+#   libmpv-2.dll, libmpv.dll.a
+# 目标结构: libmpv/include/client.h（无 mpv/ 子目录）
 # ==============================================================================
-
 if(${FLUTTER_TARGET_PLATFORM} STREQUAL "windows-x64")
   set(LIBMPV "mpv-dev-x86_64-v3-20260610-git-304426c.7z")
   set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
   set(LIBMPV_MD5 "497cceffc0f498c0c8745c8ec9bf32ba")
-  set(LIBMPV_TOP "mpv-dev-x86_64-v3-20260610-git-304426c")
 else()
   set(LIBMPV "mpv-dev-aarch64-20260610-git-304426c.7z")
   set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
   set(LIBMPV_MD5 "fd3099a41b51c643dd64e93958ada7e6")
-  set(LIBMPV_TOP "mpv-dev-aarch64-20260610-git-304426c")
 endif()
 set(LIBMPV_ARCHIVE "${CMAKE_BINARY_DIR}/${LIBMPV}")
 set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
@@ -81,48 +72,52 @@ set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
 download_and_verify(${LIBMPV_URL} ${LIBMPV_MD5} ${LIBMPV_ARCHIVE})
 
 if(NOT EXISTS "${LIBMPV_SRC}/include/client.h")
-  message(STATUS "Extracting libmpv (shinchiro)...")
+  message(STATUS "Extracting libmpv...")
 
   # 清理残留
   file(REMOVE_RECURSE "${LIBMPV_SRC}")
-  file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}")
 
-  # 步骤1：解压到 build/arm64/（有顶层目录）
+  # 步骤1：解压到临时目录（shinchiro 包有顶层目录，不能直接解压到 libmpv/）
+  set(_tmp "${CMAKE_BINARY_DIR}/_libmpv_extract")
+  file(REMOVE_RECURSE "${_tmp}")
+  file(MAKE_DIRECTORY "${_tmp}")
+
   execute_process(
-    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${CMAKE_BINARY_DIR}" -y
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${_tmp}" -y
     RESULT_VARIABLE _r
   )
   if(NOT _r EQUAL 0)
     message(FATAL_ERROR "7z extract libmpv failed: exit ${_r}")
   endif()
 
-  # 步骤2：扁平化 include/mpv/* → include/
-  file(COPY
-    "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/mpv/"
-    DESTINATION "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/"
-  )
-  file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/mpv")
+  # 步骤2：GLOB 找到唯一的顶层目录
+  file(GLOB _subdirs LIST_DIRECTORIES true "${_tmp}/*")
+  list(LENGTH _subdirs _count)
+  if(_count EQUAL 0)
+    # 没有顶层目录（类似于官方包结构）→ 直接用 _tmp 内容
+    message(STATUS "  No top-level dir detected, using flat structure")
+    file(RENAME "${_tmp}" "${LIBMPV_SRC}")
+  else()
+    # 有顶层目录 → 把内容提到 libmpv/
+    list(GET _subdirs 0 _topdir)
+    message(STATUS "  Found top-level dir: ${_topdir}")
+    file(RENAME "${_topdir}" "${LIBMPV_SRC}")
+    file(REMOVE_RECURSE "${_tmp}")
+  endif()
 
-  # 步骤3：重命名顶层目录 → libmpv
-  file(RENAME "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}" "${LIBMPV_SRC}")
+  # 步骤3：扁平化 include/mpv/* → include/
+  if(EXISTS "${LIBMPV_SRC}/include/mpv/client.h")
+    message(STATUS "  Flattening include/mpv/ → include/")
+    file(COPY "${LIBMPV_SRC}/include/mpv/" DESTINATION "${LIBMPV_SRC}/include/")
+    file(REMOVE_RECURSE "${LIBMPV_SRC}/include/mpv")
+  endif()
 
   message(STATUS "libmpv ready: ${LIBMPV_SRC}")
 endif()
 
-
 # ==============================================================================
 # ANGLE — mmozeiko/build-angle
-#
-# zip 包结构（含顶层目录）：
-#   angle-arm64/
-#     include/EGL/egl.h
-#     bin/libEGL.dll, libGLESv2.dll, d3dcompiler_47.dll
-#     lib/libEGL.dll.lib, libGLESv2.dll.lib
-#
-# media_kit_video 期望：ANGLE/include/EGL/egl.h
-# 所以：解压到 build/arm64/ → 重命名 angle-arm64 → ANGLE
 # ==============================================================================
-
 if(${FLUTTER_TARGET_PLATFORM} STREQUAL "windows-x64")
   set(ANGLE "angle-x64-2026-06-27.zip")
   set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
@@ -142,12 +137,9 @@ endif()
 
 if(NOT EXISTS "${ANGLE_SRC}/include/EGL/egl.h")
   message(STATUS "Extracting ANGLE...")
-
-  # 清理残留
   file(REMOVE_RECURSE "${ANGLE_SRC}")
   file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${ANGLE_TOP}")
 
-  # 步骤1：7z 解压 → CMAKE_BINARY_DIR（ANGLE 包有顶层目录 angle-arm64/）
   execute_process(
     COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" "-o${CMAKE_BINARY_DIR}" -y
     RESULT_VARIABLE _r
@@ -156,13 +148,10 @@ if(NOT EXISTS "${ANGLE_SRC}/include/EGL/egl.h")
     message(FATAL_ERROR "7z extract ANGLE failed: exit ${_r}")
   endif()
 
-  # 步骤2：重命名 angle-arm64 → ANGLE
   file(RENAME "${CMAKE_BINARY_DIR}/${ANGLE_TOP}" "${ANGLE_SRC}")
   message(STATUS "ANGLE ready: ${ANGLE_SRC}")
 endif()
 
-# ==============================================================================
-# 构建 Flutter 插件
 # ==============================================================================
 set(PLUGIN_NAME "media_kit_libs_windows_video_plugin")
 
