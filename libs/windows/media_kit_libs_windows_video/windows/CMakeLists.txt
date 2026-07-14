@@ -148,17 +148,13 @@ if(NOT LIBMPV_SRC_VALID)
   add_custom_command(
     TARGET "${PROJECT_NAME}_LIBMPV_EXTRACT" POST_BUILD
 
-    # --------------------------------------------------------------------------
+    # 第0步：如果 libmpv 目录是上次构建残留的，先删掉
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "${LIBMPV_SRC}"
+
     # 第1步：解压 7z 到 CMAKE_BINARY_DIR
-    #         解压后产生 ${LIBMPV_DIR}/ 目录（如 mpv-dev-aarch64-20260610-git-304426c/）
-    # --------------------------------------------------------------------------
     COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" -o"${CMAKE_BINARY_DIR}" -y
 
-    # --------------------------------------------------------------------------
-    # 第2步：把 include/mpv/*.h 逐个拷贝到 include/（消除 mpv/ 这一层）
-    #         用 copy_if_different 而不是 copy_directory，因为 Windows 上
-    #         copy_directory 在目标已存在时会失败
-    # --------------------------------------------------------------------------
+    # 第2步：把 include/mpv/*.h 逐个拷贝到 include/（消除 mpv/ 层）
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}/include/mpv/client.h"
       "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}/include/client.h"
@@ -172,20 +168,17 @@ if(NOT LIBMPV_SRC_VALID)
       "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}/include/mpv/stream_cb.h"
       "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}/include/stream_cb.h"
 
-    # --------------------------------------------------------------------------
-    # 第3步：删除原来的 include/mpv/ 子目录（头文件已提到上层）
-    # --------------------------------------------------------------------------
+    # 第3步：删除原来的 include/mpv/ 子目录
     COMMAND ${CMAKE_COMMAND} -E remove_directory
       "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}/include/mpv"
 
-    # --------------------------------------------------------------------------
-    # 第4步：重命名 ${LIBMPV_DIR} → libmpv（media_kit_video 期望的名字）
-    # --------------------------------------------------------------------------
+    # 第4步：重命名为 libmpv
     COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}" "${LIBMPV_SRC}"
 
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
 endif()
+
 
 
 # ==============================================================================
@@ -245,21 +238,19 @@ if(NOT ANGLE_SRC_VALID)
   add_custom_command(
     TARGET "${PROJECT_NAME}_ANGLE_EXTRACT" POST_BUILD
 
-    # --------------------------------------------------------------------------
+    # 第0步：如果 ANGLE 目录是上次构建残留的，先删掉
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "${ANGLE_SRC}"
+
     # 第1步：解压到 CMAKE_BINARY_DIR
-    #         解压后产生 ${ANGLE_DIR}/ 目录（如 angle-arm64/）
-    # --------------------------------------------------------------------------
     COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}" -y
 
-    # --------------------------------------------------------------------------
-    # 第2步：重命名 ${ANGLE_DIR} → ANGLE（消除 angle-arm64/ 这一层）
-    #         ANGLE 内部已有 include/、bin/、lib/ 子目录，无需额外处理
-    # --------------------------------------------------------------------------
+    # 第2步：重命名 angle-arm64 → ANGLE
     COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_BINARY_DIR}/${ANGLE_DIR}" "${ANGLE_SRC}"
 
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
 endif()
+
 
 # ==============================================================================
 # 构建 Flutter 插件
