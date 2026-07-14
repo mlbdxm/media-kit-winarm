@@ -38,7 +38,7 @@ function(download_and_verify url md5 locationForArchive)
 endfunction()
 
 # ==============================================================================
-# 查找 7-Zip
+# 7-Zip
 # ==============================================================================
 find_program(SEVENZ_EXECUTABLE NAMES 7z 7za
   PATHS
@@ -55,8 +55,15 @@ message(STATUS "7-Zip: ${SEVENZ_EXECUTABLE}")
 # ==============================================================================
 # libmpv — 官方 media-kit/libmpv-win32-video-cmake
 #
-# 不知道官方包是 include/client.h（扁平）还是 include/mpv/client.h（嵌套），
-# 所以解压后自动检测并适配。
+# 官方 7z 包的结构（无顶层目录）：
+#   include/
+#     mpv/
+#       client.h, render.h, render_gl.h, stream_cb.h
+#   libmpv-2.dll
+#   libmpv.dll.a
+#
+# media_kit_video 期望：libmpv/include/client.h
+# 所以：解压到 libmpv/ → 把 include/mpv/* 提到 include/ → 删除 include/mpv/
 # ==============================================================================
 
 if(${FLUTTER_TARGET_PLATFORM} STREQUAL "windows-x64")
@@ -68,7 +75,6 @@ else()
   set(LIBMPV_URL "https://github.com/media-kit/libmpv-win32-video-cmake/releases/download/20241021/${LIBMPV}")
   set(LIBMPV_MD5 "5b507a35db13eee6cb7eb21e8be7c83d")
 endif()
-string(REGEX REPLACE "\\.7z$" "" LIBMPV_TOP "${LIBMPV}")
 set(LIBMPV_ARCHIVE "${CMAKE_BINARY_DIR}/${LIBMPV}")
 set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
 
@@ -77,42 +83,40 @@ download_and_verify(${LIBMPV_URL} ${LIBMPV_MD5} ${LIBMPV_ARCHIVE})
 if(NOT EXISTS "${LIBMPV_SRC}/include/client.h")
   message(STATUS "Extracting libmpv...")
 
-  # 清理
+  # 清理残留
   file(REMOVE_RECURSE "${LIBMPV_SRC}")
-  file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}")
 
-  # 步骤1：7z 解压
+  # 步骤1：7z 解压 → 直接解压到 libmpv/（官方包无顶层目录）
+  #         -o 和路径不能有空格！
   execute_process(
-    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${CMAKE_BINARY_DIR}" -y
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${LIBMPV_SRC}" -y
     RESULT_VARIABLE _r
   )
   if(NOT _r EQUAL 0)
     message(FATAL_ERROR "7z extract libmpv failed: exit ${_r}")
   endif()
 
-  # 步骤2：检测结构并适配
-  #  情况A: include/client.h 已存在 → 直接改名即可
-  #  情况B: include/mpv/client.h 存在 → 先把 mpv/* 提到 include/，再改名
-  if(EXISTS "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/mpv/client.h")
-    message(STATUS "  Detected nested structure (include/mpv/), flattening...")
-    file(COPY
-      "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/mpv/"
-      DESTINATION "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/"
-    )
-    file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/mpv")
-  elseif(EXISTS "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/client.h")
-    message(STATUS "  Detected flat structure, no flattening needed.")
-  else()
-    message(FATAL_ERROR "Unexpected libmpv archive structure. Cannot find client.h")
+  # 步骤2：把 include/mpv/* 提到 include/，然后删除 mpv/
+  if(EXISTS "${LIBMPV_SRC}/include/mpv/client.h")
+    message(STATUS "  Flattening include/mpv/ → include/ ...")
+    file(COPY "${LIBMPV_SRC}/include/mpv/" DESTINATION "${LIBMPV_SRC}/include/")
+    file(REMOVE_RECURSE "${LIBMPV_SRC}/include/mpv")
   endif()
 
-  # 步骤3：重命名 → libmpv
-  file(RENAME "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}" "${LIBMPV_SRC}")
   message(STATUS "libmpv ready: ${LIBMPV_SRC}")
 endif()
 
 # ==============================================================================
 # ANGLE — mmozeiko/build-angle
+#
+# zip 包结构（含顶层目录）：
+#   angle-arm64/
+#     include/EGL/egl.h
+#     bin/libEGL.dll, libGLESv2.dll, d3dcompiler_47.dll
+#     lib/libEGL.dll.lib, libGLESv2.dll.lib
+#
+# media_kit_video 期望：ANGLE/include/EGL/egl.h
+# 所以：解压到 build/arm64/ → 重命名 angle-arm64 → ANGLE
 # ==============================================================================
 
 if(${FLUTTER_TARGET_PLATFORM} STREQUAL "windows-x64")
@@ -135,9 +139,11 @@ endif()
 if(NOT EXISTS "${ANGLE_SRC}/include/EGL/egl.h")
   message(STATUS "Extracting ANGLE...")
 
+  # 清理残留
   file(REMOVE_RECURSE "${ANGLE_SRC}")
   file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${ANGLE_TOP}")
 
+  # 步骤1：7z 解压 → CMAKE_BINARY_DIR（ANGLE 包有顶层目录 angle-arm64/）
   execute_process(
     COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" "-o${CMAKE_BINARY_DIR}" -y
     RESULT_VARIABLE _r
@@ -146,6 +152,7 @@ if(NOT EXISTS "${ANGLE_SRC}/include/EGL/egl.h")
     message(FATAL_ERROR "7z extract ANGLE failed: exit ${_r}")
   endif()
 
+  # 步骤2：重命名 angle-arm64 → ANGLE
   file(RENAME "${CMAKE_BINARY_DIR}/${ANGLE_TOP}" "${ANGLE_SRC}")
   message(STATUS "ANGLE ready: ${ANGLE_SRC}")
 endif()
