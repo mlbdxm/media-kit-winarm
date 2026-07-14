@@ -145,8 +145,8 @@ if(NOT LIBMPV_SRC_VALID)
 endif()
 
 
-# ============ ANGLE (ARM64 & x64 from mmozeiko/build-angle) ============
 
+# ============ ANGLE (ARM64 & x64 from mmozeiko/build-angle) ============
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
   set(ANGLE "angle-arm64-2026-06-27.zip")
   set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
@@ -156,27 +156,26 @@ else()
   set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
   set(ANGLE_DIR "angle-x64")
 endif()
-
 set(ANGLE_ARCHIVE "${CMAKE_BINARY_DIR}/${ANGLE}")
 set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE")
-
 if(NOT EXISTS "${ANGLE_ARCHIVE}")
   message(STATUS "Downloading ANGLE from ${ANGLE_URL}...")
   file(DOWNLOAD "${ANGLE_URL}" "${ANGLE_ARCHIVE}" SHOW_PROGRESS)
 endif()
-
 check_directory_exists_and_not_empty(${ANGLE_SRC} ANGLE_SRC_VALID)
-
 if(NOT ANGLE_SRC_VALID)
   message(STATUS "Extracting ${ANGLE}...")
   add_custom_target("${PROJECT_NAME}_ANGLE_EXTRACT" ALL)
   add_custom_command(
     TARGET "${PROJECT_NAME}_ANGLE_EXTRACT" POST_BUILD
+    # Step 1: Extract zip to CMAKE_BINARY_DIR → creates ${ANGLE_DIR}/
     COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}" -y
+    # Step 2: Rename ${ANGLE_DIR} → ANGLE
     COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_BINARY_DIR}/${ANGLE_DIR}" "${ANGLE_SRC}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
 endif()
+
 
 # ------------------------------------------------------------------------------
 set(PLUGIN_NAME "media_kit_libs_windows_video_plugin")
@@ -221,3 +220,4 @@ set(
   "${ANGLE_SRC}/bin/libGLESv2.dll"
   PARENT_SCOPE
 )
+
