@@ -53,27 +53,27 @@ endif()
 message(STATUS "7-Zip: ${SEVENZ_EXECUTABLE}")
 
 # ==============================================================================
-# libmpv — 官方 media-kit/libmpv-win32-video-cmake
+# libmpv — shinchiro/mpv-winbuild-cmake
 #
-# 官方 7z 包的结构（无顶层目录）：
-#   include/
-#     mpv/
-#       client.h, render.h, render_gl.h, stream_cb.h
-#   libmpv-2.dll
-#   libmpv.dll.a
-#
-# media_kit_video 期望：libmpv/include/client.h
-# 所以：解压到 libmpv/ → 把 include/mpv/* 提到 include/ → 删除 include/mpv/
+# 7z 包结构（有顶层目录）：
+#   mpv-dev-aarch64-20260610-git-304426c/
+#     include/
+#       mpv/
+#         client.h, render.h, render_gl.h, stream_cb.h
+#     libmpv-2.dll
+#     libmpv.dll.a
 # ==============================================================================
 
 if(${FLUTTER_TARGET_PLATFORM} STREQUAL "windows-x64")
-  set(LIBMPV "mpv-dev-x86_64-20241021-git-0f78584.7z")
-  set(LIBMPV_URL "https://github.com/media-kit/libmpv-win32-video-cmake/releases/download/20241021/${LIBMPV}")
-  set(LIBMPV_MD5 "6ecf18e85b093c3f7edb16f3ee6603f3")
+  set(LIBMPV "mpv-dev-x86_64-v3-20260610-git-304426c.7z")
+  set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
+  set(LIBMPV_MD5 "497cceffc0f498c0c8745c8ec9bf32ba")
+  set(LIBMPV_TOP "mpv-dev-x86_64-v3-20260610-git-304426c")
 else()
-  set(LIBMPV "mpv-dev-aarch64-20241021-git-0f78584.7z")
-  set(LIBMPV_URL "https://github.com/media-kit/libmpv-win32-video-cmake/releases/download/20241021/${LIBMPV}")
-  set(LIBMPV_MD5 "5b507a35db13eee6cb7eb21e8be7c83d")
+  set(LIBMPV "mpv-dev-aarch64-20260610-git-304426c.7z")
+  set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
+  set(LIBMPV_MD5 "fd3099a41b51c643dd64e93958ada7e6")
+  set(LIBMPV_TOP "mpv-dev-aarch64-20260610-git-304426c")
 endif()
 set(LIBMPV_ARCHIVE "${CMAKE_BINARY_DIR}/${LIBMPV}")
 set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
@@ -81,30 +81,34 @@ set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
 download_and_verify(${LIBMPV_URL} ${LIBMPV_MD5} ${LIBMPV_ARCHIVE})
 
 if(NOT EXISTS "${LIBMPV_SRC}/include/client.h")
-  message(STATUS "Extracting libmpv...")
+  message(STATUS "Extracting libmpv (shinchiro)...")
 
   # 清理残留
   file(REMOVE_RECURSE "${LIBMPV_SRC}")
+  file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}")
 
-  # 步骤1：7z 解压 → 直接解压到 libmpv/（官方包无顶层目录）
-  #         -o 和路径不能有空格！
+  # 步骤1：解压到 build/arm64/（有顶层目录）
   execute_process(
-    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${LIBMPV_SRC}" -y
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${CMAKE_BINARY_DIR}" -y
     RESULT_VARIABLE _r
   )
   if(NOT _r EQUAL 0)
     message(FATAL_ERROR "7z extract libmpv failed: exit ${_r}")
   endif()
 
-  # 步骤2：把 include/mpv/* 提到 include/，然后删除 mpv/
-  if(EXISTS "${LIBMPV_SRC}/include/mpv/client.h")
-    message(STATUS "  Flattening include/mpv/ → include/ ...")
-    file(COPY "${LIBMPV_SRC}/include/mpv/" DESTINATION "${LIBMPV_SRC}/include/")
-    file(REMOVE_RECURSE "${LIBMPV_SRC}/include/mpv")
-  endif()
+  # 步骤2：扁平化 include/mpv/* → include/
+  file(COPY
+    "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/mpv/"
+    DESTINATION "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/"
+  )
+  file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}/include/mpv")
+
+  # 步骤3：重命名顶层目录 → libmpv
+  file(RENAME "${CMAKE_BINARY_DIR}/${LIBMPV_TOP}" "${LIBMPV_SRC}")
 
   message(STATUS "libmpv ready: ${LIBMPV_SRC}")
 endif()
+
 
 # ==============================================================================
 # ANGLE — mmozeiko/build-angle
