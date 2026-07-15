@@ -53,11 +53,9 @@ message(STATUS "7-Zip: ${SEVENZ_EXECUTABLE}")
 # ==============================================================================
 # libmpv — shinchiro/mpv-winbuild-cmake
 #
-# 7z 包结构（有顶层目录）：
+# 7z 包结构（有顶层目录，内部可能是 include/mpv/ 或直接 mpv/）：
 #   mpv-dev-aarch64-.../
-#     include/
-#       mpv/
-#         client.h, render.h, render_gl.h, stream_cb.h
+#     include/mpv/client.h  或  mpv/client.h
 #     libmpv-2.dll, libmpv.dll.a
 #
 # media_kit 需要: libmpv/include/client.h
@@ -82,7 +80,7 @@ if(NOT EXISTS "${LIBMPV_SRC}/include/client.h")
   # 清理残留
   file(REMOVE_RECURSE "${LIBMPV_SRC}")
 
-  # 步骤1：解压到 libmpv/（包有顶层目录，解压后 libmpv/ 下面多一层）
+  # 步骤1：解压到 libmpv/
   execute_process(
     COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${LIBMPV_SRC}" -y
     RESULT_VARIABLE _r
@@ -91,29 +89,31 @@ if(NOT EXISTS "${LIBMPV_SRC}/include/client.h")
     message(FATAL_ERROR "7z extract libmpv failed: exit ${_r}")
   endif()
 
-  # 步骤2：GLOB 找到唯一的顶层子目录
+  # 步骤2：找到顶层子目录，把内容提出来
   file(GLOB _subdirs LIST_DIRECTORIES true "${LIBMPV_SRC}/*")
   list(LENGTH _subdirs _count)
-  if(_count EQUAL 0)
-    message(FATAL_ERROR "Unexpected libmpv archive structure: no subdirectory found")
+  if(_count GREATER 0)
+    list(GET _subdirs 0 _topdir)
+    # 把顶层目录内容拷贝到 libmpv/，然后删掉顶层目录
+    file(COPY "${_topdir}/" DESTINATION "${LIBMPV_SRC}/")
+    file(REMOVE_RECURSE "${_topdir}")
   endif()
-  list(GET _subdirs 0 _topdir)
 
-  # 步骤3：把顶层目录内容提到 libmpv/ 根目录
-  #        先删掉刚创建的空 libmpv/，再把 _topdir 重命名为 libmpv
-  file(RENAME "${_topdir}" "${CMAKE_BINARY_DIR}/_libmpv_rename_tmp")
-  file(REMOVE_RECURSE "${LIBMPV_SRC}")
-  file(RENAME "${CMAKE_BINARY_DIR}/_libmpv_rename_tmp" "${LIBMPV_SRC}")
-
-  # 步骤4：扁平化 include/mpv/* → include/
+  # 步骤3：扁平化 — 把 mpv/* 提到 include/
+  #  情况A: include/mpv/client.h → 拷贝 include/mpv/* 到 include/, 删 mpv/
+  #  情况B: mpv/client.h（无 include）→ 重命名 mpv → include
   if(EXISTS "${LIBMPV_SRC}/include/mpv/client.h")
     message(STATUS "  Flattening include/mpv/ → include/")
     file(COPY "${LIBMPV_SRC}/include/mpv/" DESTINATION "${LIBMPV_SRC}/include/")
     file(REMOVE_RECURSE "${LIBMPV_SRC}/include/mpv")
+  elseif(EXISTS "${LIBMPV_SRC}/mpv/client.h")
+    message(STATUS "  Renaming mpv/ → include/")
+    file(RENAME "${LIBMPV_SRC}/mpv" "${LIBMPV_SRC}/include")
   endif()
 
   message(STATUS "libmpv ready: ${LIBMPV_SRC}")
 endif()
+
 
 # ==============================================================================
 # ANGLE — mmozeiko/build-angle
