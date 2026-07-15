@@ -52,10 +52,15 @@ message(STATUS "7-Zip: ${SEVENZ_EXECUTABLE}")
 
 # ==============================================================================
 # libmpv — shinchiro/mpv-winbuild-cmake
-# 7z 包结构（有顶层目录 mpv-dev-aarch64-.../）：
-#   include/mpv/client.h, render.h, render_gl.h, stream_cb.h
-#   libmpv-2.dll, libmpv.dll.a
-# 目标结构: libmpv/include/client.h（无 mpv/ 子目录）
+#
+# 7z 包结构（有顶层目录）：
+#   mpv-dev-aarch64-.../
+#     include/
+#       mpv/
+#         client.h, render.h, render_gl.h, stream_cb.h
+#     libmpv-2.dll, libmpv.dll.a
+#
+# media_kit 需要: libmpv/include/client.h
 # ==============================================================================
 if(${FLUTTER_TARGET_PLATFORM} STREQUAL "windows-x64")
   set(LIBMPV "mpv-dev-x86_64-v3-20260610-git-304426c.7z")
@@ -77,35 +82,30 @@ if(NOT EXISTS "${LIBMPV_SRC}/include/client.h")
   # 清理残留
   file(REMOVE_RECURSE "${LIBMPV_SRC}")
 
-  # 步骤1：解压到临时目录（shinchiro 包有顶层目录，不能直接解压到 libmpv/）
-  set(_tmp "${CMAKE_BINARY_DIR}/_libmpv_extract")
-  file(REMOVE_RECURSE "${_tmp}")
-  file(MAKE_DIRECTORY "${_tmp}")
-
+  # 步骤1：解压到 libmpv/（包有顶层目录，解压后 libmpv/ 下面多一层）
   execute_process(
-    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${_tmp}" -y
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${LIBMPV_SRC}" -y
     RESULT_VARIABLE _r
   )
   if(NOT _r EQUAL 0)
     message(FATAL_ERROR "7z extract libmpv failed: exit ${_r}")
   endif()
 
-  # 步骤2：GLOB 找到唯一的顶层目录
-  file(GLOB _subdirs LIST_DIRECTORIES true "${_tmp}/*")
+  # 步骤2：GLOB 找到唯一的顶层子目录
+  file(GLOB _subdirs LIST_DIRECTORIES true "${LIBMPV_SRC}/*")
   list(LENGTH _subdirs _count)
   if(_count EQUAL 0)
-    # 没有顶层目录（类似于官方包结构）→ 直接用 _tmp 内容
-    message(STATUS "  No top-level dir detected, using flat structure")
-    file(RENAME "${_tmp}" "${LIBMPV_SRC}")
-  else()
-    # 有顶层目录 → 把内容提到 libmpv/
-    list(GET _subdirs 0 _topdir)
-    message(STATUS "  Found top-level dir: ${_topdir}")
-    file(RENAME "${_topdir}" "${LIBMPV_SRC}")
-    file(REMOVE_RECURSE "${_tmp}")
+    message(FATAL_ERROR "Unexpected libmpv archive structure: no subdirectory found")
   endif()
+  list(GET _subdirs 0 _topdir)
 
-  # 步骤3：扁平化 include/mpv/* → include/
+  # 步骤3：把顶层目录内容提到 libmpv/ 根目录
+  #        先删掉刚创建的空 libmpv/，再把 _topdir 重命名为 libmpv
+  file(RENAME "${_topdir}" "${CMAKE_BINARY_DIR}/_libmpv_rename_tmp")
+  file(REMOVE_RECURSE "${LIBMPV_SRC}")
+  file(RENAME "${CMAKE_BINARY_DIR}/_libmpv_rename_tmp" "${LIBMPV_SRC}")
+
+  # 步骤4：扁平化 include/mpv/* → include/
   if(EXISTS "${LIBMPV_SRC}/include/mpv/client.h")
     message(STATUS "  Flattening include/mpv/ → include/")
     file(COPY "${LIBMPV_SRC}/include/mpv/" DESTINATION "${LIBMPV_SRC}/include/")
