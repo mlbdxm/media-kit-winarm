@@ -82,7 +82,7 @@ class CupertinoVideoControlsTheme extends InheritedWidget {
 
 /// {@macro cupertino_video_controls}
 class _CupertinoVideoControls extends StatefulWidget {
-  const _CupertinoVideoControls();
+  const _CupertinoVideoControls({Key? key}) : super(key: key);
 
   @override
   State<_CupertinoVideoControls> createState() =>

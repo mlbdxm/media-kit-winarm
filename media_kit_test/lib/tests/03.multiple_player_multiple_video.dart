@@ -6,7 +6,7 @@ import '../common/globals.dart';
 import '../common/sources/sources.dart';
 
 class MultiplePlayerMultipleVideoScreen extends StatefulWidget {
-  const MultiplePlayerMultipleVideoScreen({super.key});
+  const MultiplePlayerMultipleVideoScreen({Key? key}) : super(key: key);
 
   @override
   State<MultiplePlayerMultipleVideoScreen> createState() =>

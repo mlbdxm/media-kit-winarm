@@ -7,7 +7,7 @@ import '../common/sources/sources.dart';
 import '../common/widgets.dart';
 
 class Screenshot extends StatefulWidget {
-  const Screenshot({super.key});
+  const Screenshot({Key? key}) : super(key: key);
 
   @override
   State<Screenshot> createState() => _ScreenshotState();

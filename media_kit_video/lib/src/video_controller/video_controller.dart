@@ -68,6 +68,15 @@ class VideoController {
   /// [Rect] of the video output, received from the native implementation.
   final ValueNotifier<Rect?> rect = ValueNotifier<Rect?>(null);
 
+  /// Backwards-compatible factory matching media_kit_video 1.2.x API.
+  static VideoController create(
+    Player player, {
+    VideoControllerConfiguration configuration =
+        const VideoControllerConfiguration(),
+  }) {
+    return VideoController(player, configuration: configuration);
+  }
+
   /// {@macro video_controller}
   VideoController(
     this.player, {
@@ -77,10 +86,6 @@ class VideoController {
     player.platform?.isVideoControllerAttached = true;
 
     () async {
-      final completer = Completer();
-      WidgetsBinding.instance.addPostFrameCallback((_) => completer.complete());
-      await completer.future;
-
       try {
         if (NativeVideoController.supported) {
           final result = await NativeVideoController.create(
@@ -97,10 +102,7 @@ class VideoController {
           platform.complete(result);
           notifier.value = result;
         } else if (WebVideoController.supported) {
-          final result = await WebVideoController.create(
-            player,
-            configuration,
-          );
+          final result = await WebVideoController.create(player, configuration);
           platform.complete(result);
           notifier.value = result;
         }
@@ -145,15 +147,9 @@ class VideoController {
   /// Remember:
   /// * “Premature optimization is the root of all evil”
   /// * “With great power comes great responsibility”
-  Future<void> setSize({
-    int? width,
-    int? height,
-  }) async {
+  Future<void> setSize({int? width, int? height}) async {
     final instance = await platform.future;
-    return instance.setSize(
-      width: width,
-      height: height,
-    );
+    return instance.setSize(width: width, height: height);
   }
 
   /// A [Future] that completes when the first video frame has been rendered.

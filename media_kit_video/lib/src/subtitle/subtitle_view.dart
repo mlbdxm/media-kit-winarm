@@ -26,10 +26,10 @@ class SubtitleView extends StatefulWidget {
 
   /// {@macro subtitle_view}
   const SubtitleView({
-    super.key,
+    Key? key,
     required this.controller,
     required this.configuration,
-  });
+  }) : super(key: key);
 
   @override
   SubtitleViewState createState() => SubtitleViewState();
@@ -95,21 +95,42 @@ class SubtitleViewState extends State<SubtitleView> {
 
         final textScaler = widget.configuration.textScaler ??
             TextScaler.linear(textScaleFactor);
-        return Material(
-          color: Colors.transparent,
-          child: AnimatedContainer(
-            padding: padding,
-            duration: duration,
-            alignment: Alignment.bottomCenter,
-            child: Text(
+
+        Widget text(TextStyle style) => Text(
               [
                 for (final line in subtitle)
                   if (line.trim().isNotEmpty) line.trim(),
               ].join('\n'),
-              style: widget.configuration.style,
+              style: style,
               textAlign: widget.configuration.textAlign,
               textScaler: textScaler,
-            ),
+            );
+
+        return Material(
+          color: Colors.transparent,
+          child: AnimatedContainer(
+            padding: widget.configuration.padding,
+            duration: duration,
+            alignment: Alignment.bottomCenter,
+            child: widget.configuration.strokeWidth != null
+                ? Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      text(
+                        widget.configuration.style.copyWith(
+                          color: null,
+                          background: null,
+                          backgroundColor: null,
+                          foreground: Paint()
+                            ..color = Colors.black
+                            ..style = PaintingStyle.stroke
+                            ..strokeWidth = widget.configuration.strokeWidth!,
+                        ),
+                      ),
+                      text(widget.configuration.style),
+                    ],
+                  )
+                : text(widget.configuration.style),
           ),
         );
       },
@@ -139,6 +160,8 @@ class SubtitleViewConfiguration {
   /// The padding to be used for the subtitles.
   final EdgeInsets padding;
 
+  final double? strokeWidth;
+
   /// {@macro subtitle_view_configuration}
   const SubtitleViewConfiguration({
     this.visible = true,
@@ -159,5 +182,6 @@ class SubtitleViewConfiguration {
       16.0,
       24.0,
     ),
+    this.strokeWidth,
   });
 }

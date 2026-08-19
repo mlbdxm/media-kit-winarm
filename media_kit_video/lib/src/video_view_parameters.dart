@@ -27,7 +27,6 @@ class VideoViewParameters {
   final FilterQuality filterQuality;
   final /* VideoControlsBuilder? */ dynamic controls;
   final SubtitleViewConfiguration subtitleViewConfiguration;
-  final FocusNode? focusNode;
 
   /// {@macro video_view_parameters}
   VideoViewParameters({
@@ -40,7 +39,6 @@ class VideoViewParameters {
     required this.filterQuality,
     required this.controls,
     required this.subtitleViewConfiguration,
-    this.focusNode,
   });
 
   VideoViewParameters copyWith({
@@ -57,7 +55,6 @@ class VideoViewParameters {
     SubtitleViewConfiguration? subtitleViewConfiguration,
     Future<void> Function()? onEnterFullscreen,
     Future<void> Function()? onExitFullscreen,
-    FocusNode? focusNode,
   }) {
     return VideoViewParameters(
       width: width ?? this.width,
@@ -70,7 +67,6 @@ class VideoViewParameters {
       controls: controls ?? this.controls,
       subtitleViewConfiguration:
           subtitleViewConfiguration ?? this.subtitleViewConfiguration,
-      focusNode: focusNode ?? this.focusNode,
     );
   }
 
@@ -86,8 +82,7 @@ class VideoViewParameters {
           other.aspectRatio == aspectRatio &&
           other.filterQuality == filterQuality &&
           other.controls == controls &&
-          other.subtitleViewConfiguration == subtitleViewConfiguration &&
-          other.focusNode == focusNode;
+          other.subtitleViewConfiguration == subtitleViewConfiguration;
 
   @override
   int get hashCode =>
@@ -99,6 +94,5 @@ class VideoViewParameters {
       aspectRatio.hashCode ^
       filterQuality.hashCode ^
       controls.hashCode ^
-      subtitleViewConfiguration.hashCode ^
-      focusNode.hashCode;
+      subtitleViewConfiguration.hashCode;
 }

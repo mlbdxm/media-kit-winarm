@@ -6,171 +6,161 @@
 
 cmake_minimum_required(VERSION 3.14)
 
-# This option is read by the other packages which are part of package:media_kit.
+cmake_policy(SET CMP0175 NEW)
+
 option(MEDIA_KIT_LIBS_AVAILABLE "package:media_kit libraries are available." ON)
 
 set(PROJECT_NAME "media_kit_libs_windows_video")
 project(${PROJECT_NAME} LANGUAGES CXX)
 
-# Deal with MSVC incompatiblity
 add_compile_definitions(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
 
-# ------------------------------------------------------------------------------
+# ==============================================================================
 function(download_and_verify url md5 locationForArchive)
-  # Check if the archive exists.
   if(EXISTS "${locationForArchive}")
     file(MD5 "${locationForArchive}" ARCHIVE_MD5)
-
-    # If MD5 doesn't match, delete the archive to download again.
     if(NOT md5 STREQUAL ARCHIVE_MD5)
       file(REMOVE "${locationForArchive}")
       message(STATUS "MD5 mismatch. File deleted.")
     endif()
   endif()
-
-  # Download the archive if it doesn't exist.
   if(NOT EXISTS "${locationForArchive}")
     message(STATUS "Downloading archive from ${url}...")
     file(DOWNLOAD "${url}" "${locationForArchive}")
     message(STATUS "Downloaded archive to ${locationForArchive}.")
-
-    # Verify MD5 of the newly downloaded file.
     file(MD5 "${locationForArchive}" ARCHIVE_MD5)
-
     if(md5 STREQUAL ARCHIVE_MD5)
       message(STATUS "${locationForArchive} Verification successful.")
     else()
-      message(FATAL_ERROR "${locationForArchive} Integrity check failed, please try to re-build project again.")
+      message(FATAL_ERROR "${locationForArchive} Integrity check failed.")
     endif()
   endif()
 endfunction()
 
-function(check_directory_exists_and_not_empty dir result_var)
-  # Check if the directory exists
-  if(EXISTS "${dir}")
-    # Check if the directory is not empty
-    file(GLOB dir_contents "${dir}/*")
-
-    if(dir_contents)
-      set(${result_var} TRUE PARENT_SCOPE)
-    else()
-      set(${result_var} FALSE PARENT_SCOPE)
-      message(STATUS "Directory ${dir} exists but is empty!")
-    endif()
-  else()
-    set(${result_var} FALSE PARENT_SCOPE)
-    message(STATUS "Directory ${dir} does not exist!")
-  endif()
-endfunction()
-
-# ============ 7-Zip ============
-
-# 1. 先找系统已安装的 7z
-find_program(SEVENZ_EXECUTABLE 7z
+# ==============================================================================
+find_program(SEVENZ_EXECUTABLE NAMES 7z 7za
   PATHS
     "C:/Program Files/7-Zip"
     "C:/Program Files (x86)/7-Zip"
     "$ENV{ProgramFiles}/7-Zip"
     "$ENV{ProgramFiles\(x86\)}/7-Zip"
 )
-
-# 2. 找不到则下载最新 7-Zip Extra
 if(NOT SEVENZ_EXECUTABLE)
-  set(SEVENZ_URL "https://www.7-zip.org/a/7z2409-extra.7z")
-  set(SEVENZ_ARCHIVE "${CMAKE_BINARY_DIR}/7z-extra.7z")
-  set(SEVENZ_DIR "${CMAKE_BINARY_DIR}/7z-extra")
-
-  if(NOT EXISTS "${SEVENZ_DIR}")
-    if(NOT EXISTS "${SEVENZ_ARCHIVE}")
-      message(STATUS "Downloading 7-Zip Extra from ${SEVENZ_URL}...")
-      file(DOWNLOAD "${SEVENZ_URL}" "${SEVENZ_ARCHIVE}" SHOW_PROGRESS)
-    endif()
-    message(STATUS "Extracting 7-Zip Extra...")
-    file(ARCHIVE_EXTRACT INPUT "${SEVENZ_ARCHIVE}" DESTINATION "${SEVENZ_DIR}")
-  endif()
-
-  if(EXISTS "${SEVENZ_DIR}/x64/7za.exe")
-    set(SEVENZ_EXECUTABLE "${SEVENZ_DIR}/x64/7za.exe")
-  elseif(EXISTS "${SEVENZ_DIR}/7za.exe")
-    set(SEVENZ_EXECUTABLE "${SEVENZ_DIR}/7za.exe")
-  elseif(EXISTS "${SEVENZ_DIR}/x86/7za.exe")
-    set(SEVENZ_EXECUTABLE "${SEVENZ_DIR}/x86/7za.exe")
-  endif()
+  message(FATAL_ERROR "7-Zip not found. Install: winget install 7zip.7zip")
 endif()
+message(STATUS "7-Zip: ${SEVENZ_EXECUTABLE}")
 
-if(NOT SEVENZ_EXECUTABLE)
-  message(FATAL_ERROR "7-Zip not found and auto-download failed. Install: winget install 7zip.7zip")
-endif()
-
-message(STATUS "Using 7-Zip: ${SEVENZ_EXECUTABLE}")
-
-# ============ libmpv ============
-
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
-  set(LIBMPV "mpv-dev-aarch64-20260610-git-304426c.7z")
-  set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
-  set(LIBMPV_MD5 "fd3099a41b51c643dd64e93958ada7e6")
-  set(LIBMPV_DIR "mpv-dev-aarch64-20260610-git-304426c")
-else()
+# ==============================================================================
+# libmpv — shinchiro/mpv-winbuild-cmake
+#
+# 7z 包结构（无顶层目录，实测 7z l 输出第一层就是 include/ + libmpv-2.dll）：
+#   include/mpv/client.h, render.h, render_gl.h, stream_cb.h
+#   libmpv-2.dll, libmpv.dll.a
+#
+# media_kit 需要: libmpv/include/client.h
+# ==============================================================================
+if(${FLUTTER_TARGET_PLATFORM} STREQUAL "windows-x64")
   set(LIBMPV "mpv-dev-x86_64-v3-20260610-git-304426c.7z")
   set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
   set(LIBMPV_MD5 "497cceffc0f498c0c8745c8ec9bf32ba")
-  set(LIBMPV_DIR "mpv-dev-x86_64-v3-20260610-git-304426c")
+else()
+  set(LIBMPV "mpv-dev-aarch64-20260610-git-304426c.7z")
+  set(LIBMPV_URL "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/${LIBMPV}")
+  set(LIBMPV_MD5 "fd3099a41b51c643dd64e93958ada7e6")
 endif()
 set(LIBMPV_ARCHIVE "${CMAKE_BINARY_DIR}/${LIBMPV}")
 set(LIBMPV_SRC "${CMAKE_BINARY_DIR}/libmpv")
+
 download_and_verify(${LIBMPV_URL} ${LIBMPV_MD5} ${LIBMPV_ARCHIVE})
-check_directory_exists_and_not_empty(${LIBMPV_SRC} LIBMPV_SRC_VALID)
-if(NOT LIBMPV_SRC_VALID)
-  message(STATUS "Extracting ${LIBMPV}...")
-  add_custom_target("${PROJECT_NAME}_LIBMPV_EXTRACT" ALL)
-  add_custom_command(
-    TARGET "${PROJECT_NAME}_LIBMPV_EXTRACT" POST_BUILD
-    # 第1步：解压到 CMAKE_BINARY_DIR → 产生 ${LIBMPV_DIR}/
-    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" -o"${CMAKE_BINARY_DIR}" -y
-    # 第2步：把 include/mpv/* 拷贝到 include/ （消除 mpv/ 这一层）
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-      "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}/include/mpv"
-      "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}/include"
-    # 第3步：重命名 ${LIBMPV_DIR} → libmpv
-    COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_BINARY_DIR}/${LIBMPV_DIR}" "${LIBMPV_SRC}"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+
+if(NOT EXISTS "${LIBMPV_SRC}/include/client.h")
+  message(STATUS "Extracting libmpv...")
+  file(REMOVE_RECURSE "${LIBMPV_SRC}")
+
+  # 解压到 libmpv/（shinchiro 包无顶层目录，直接是 include/mpv/client.h）
+  execute_process(
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${LIBMPV_ARCHIVE}" "-o${LIBMPV_SRC}" -y
+    RESULT_VARIABLE _r
   )
+  if(NOT _r EQUAL 0)
+    message(FATAL_ERROR "7z extract libmpv failed: exit ${_r}")
+  endif()
+
+  # 检查实际结构并扁平化
+  if(EXISTS "${LIBMPV_SRC}/include/mpv/client.h")
+    # 标准 shinchiro 结构：include/mpv/client.h → 提到 include/
+    message(STATUS "  Detected include/mpv/, flattening → include/")
+    file(COPY "${LIBMPV_SRC}/include/mpv/" DESTINATION "${LIBMPV_SRC}/include/")
+    file(REMOVE_RECURSE "${LIBMPV_SRC}/include/mpv")
+  elseif(EXISTS "${LIBMPV_SRC}/include/client.h")
+    # 已经扁平，无需操作
+    message(STATUS "  Already flat, no action needed.")
+  elseif(EXISTS "${LIBMPV_SRC}/mpv/client.h")
+    # GLOB/Copy 出错的残留结构：mpv/client.h → 重命名
+    message(STATUS "  Detected mpv/ (no include/), renaming → include/")
+    file(RENAME "${LIBMPV_SRC}/mpv" "${LIBMPV_SRC}/include")
+  else()
+    # 可能有顶层目录（如 mpv-dev-aarch64-.../），GLOB 提取内容后再处理
+    file(GLOB _subdirs LIST_DIRECTORIES true "${LIBMPV_SRC}/*")
+    list(LENGTH _subdirs _count)
+    if(_count GREATER 0)
+      list(GET _subdirs 0 _topdir)
+      message(STATUS "  Found top-level dir ${_topdir}, extracting...")
+      file(COPY "${_topdir}/" DESTINATION "${LIBMPV_SRC}/")
+      file(REMOVE_RECURSE "${_topdir}")
+      # 再检查
+      if(EXISTS "${LIBMPV_SRC}/include/mpv/client.h")
+        file(COPY "${LIBMPV_SRC}/include/mpv/" DESTINATION "${LIBMPV_SRC}/include/")
+        file(REMOVE_RECURSE "${LIBMPV_SRC}/include/mpv")
+      elseif(EXISTS "${LIBMPV_SRC}/mpv/client.h")
+        file(RENAME "${LIBMPV_SRC}/mpv" "${LIBMPV_SRC}/include")
+      endif()
+    else()
+      message(FATAL_ERROR "Unexpected libmpv archive structure. Cannot find client.h")
+    endif()
+  endif()
+
+  message(STATUS "libmpv ready: ${LIBMPV_SRC}")
 endif()
 
-
-
-# ============ ANGLE (ARM64 & x64 from mmozeiko/build-angle) ============
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
-  set(ANGLE "angle-arm64-2026-06-27.zip")
-  set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
-  set(ANGLE_DIR "angle-arm64")
-else()
+# ==============================================================================
+# ANGLE — mmozeiko/build-angle
+# ==============================================================================
+if(${FLUTTER_TARGET_PLATFORM} STREQUAL "windows-x64")
   set(ANGLE "angle-x64-2026-06-27.zip")
   set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
-  set(ANGLE_DIR "angle-x64")
+  set(ANGLE_TOP "angle-x64")
+else()
+  set(ANGLE "angle-arm64-2026-06-27.zip")
+  set(ANGLE_URL "https://github.com/mmozeiko/build-angle/releases/download/2026-06-27/${ANGLE}")
+  set(ANGLE_TOP "angle-arm64")
 endif()
 set(ANGLE_ARCHIVE "${CMAKE_BINARY_DIR}/${ANGLE}")
 set(ANGLE_SRC "${CMAKE_BINARY_DIR}/ANGLE")
+
 if(NOT EXISTS "${ANGLE_ARCHIVE}")
   message(STATUS "Downloading ANGLE from ${ANGLE_URL}...")
   file(DOWNLOAD "${ANGLE_URL}" "${ANGLE_ARCHIVE}" SHOW_PROGRESS)
 endif()
-check_directory_exists_and_not_empty(${ANGLE_SRC} ANGLE_SRC_VALID)
-if(NOT ANGLE_SRC_VALID)
-  message(STATUS "Extracting ${ANGLE}...")
-  add_custom_target("${PROJECT_NAME}_ANGLE_EXTRACT" ALL)
-  add_custom_command(
-    TARGET "${PROJECT_NAME}_ANGLE_EXTRACT" POST_BUILD
-    # 第1步：解压到 CMAKE_BINARY_DIR → 产生 ${ANGLE_DIR}/（如 angle-arm64/）
-    COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" -o"${CMAKE_BINARY_DIR}" -y
-    # 第2步：重命名 ${ANGLE_DIR} → ANGLE（消除 angle-arm64/ 这一层）
-    COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_BINARY_DIR}/${ANGLE_DIR}" "${ANGLE_SRC}"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+
+if(NOT EXISTS "${ANGLE_SRC}/include/EGL/egl.h")
+  message(STATUS "Extracting ANGLE...")
+  file(REMOVE_RECURSE "${ANGLE_SRC}")
+  file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${ANGLE_TOP}")
+
+  execute_process(
+    COMMAND "${SEVENZ_EXECUTABLE}" x "${ANGLE_ARCHIVE}" "-o${CMAKE_BINARY_DIR}" -y
+    RESULT_VARIABLE _r
   )
+  if(NOT _r EQUAL 0)
+    message(FATAL_ERROR "7z extract ANGLE failed: exit ${_r}")
+  endif()
+
+  file(RENAME "${CMAKE_BINARY_DIR}/${ANGLE_TOP}" "${ANGLE_SRC}")
+  message(STATUS "ANGLE ready: ${ANGLE_SRC}")
 endif()
 
-# ------------------------------------------------------------------------------
+# ==============================================================================
 set(PLUGIN_NAME "media_kit_libs_windows_video_plugin")
 
 add_library(
@@ -180,31 +170,11 @@ add_library(
 )
 
 apply_standard_settings(${PLUGIN_NAME})
+set_target_properties(${PLUGIN_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
+target_include_directories(${PLUGIN_NAME} INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 
-set_target_properties(
-  ${PLUGIN_NAME}
-  PROPERTIES
-  CXX_VISIBILITY_PRESET
-  hidden
-)
-target_compile_definitions(
-  ${PLUGIN_NAME}
-  PRIVATE
-  FLUTTER_PLUGIN_IMPL
-)
-
-target_include_directories(
-  ${PLUGIN_NAME} INTERFACE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include"
-)
-target_link_libraries(
-  ${PLUGIN_NAME}
-  PRIVATE
-  flutter
-  flutter_wrapper_plugin
-)
-
-# DLL 在新 ANGLE 包的 bin/ 目录下
 set(
   media_kit_libs_windows_video_bundled_libraries
   "${LIBMPV_SRC}/libmpv-2.dll"
@@ -213,5 +183,3 @@ set(
   "${ANGLE_SRC}/bin/libGLESv2.dll"
   PARENT_SCOPE
 )
-
-

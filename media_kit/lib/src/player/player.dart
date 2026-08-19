@@ -99,10 +99,15 @@ import 'package:media_kit/src/player/platform_player.dart';
 /// {@endtemplate}
 ///
 class Player {
-  /// {@macro player}
-  Player({
+  /// Backwards-compatible factory matching media_kit 1.1.x API.
+  static Player create({
     PlayerConfiguration configuration = const PlayerConfiguration(),
   }) {
+    return Player(configuration: configuration);
+  }
+
+  /// {@macro player}
+  Player({PlayerConfiguration configuration = const PlayerConfiguration()}) {
     if (UniversalPlatform.isWindows) {
       platform = NativePlayer(configuration: configuration);
     } else if (UniversalPlatform.isLinux) {
@@ -154,14 +159,8 @@ class Player {
   /// );
   /// ```
   ///
-  Future<void> open(
-    Playable playable, {
-    bool play = true,
-  }) async {
-    return platform?.open(
-      playable,
-      play: play,
-    );
+  Future<void> open(Playable playable, {bool play = true}) async {
+    return platform?.open(playable, play: play);
   }
 
   /// Stops the [Player].
@@ -305,6 +304,24 @@ class Player {
     return platform?.setSubtitleTrack(track);
   }
 
+  /// Sets the current secondary [SubtitleTrack] for subtitle output.
+  Future<void> setSecondarySubtitleTrack(SubtitleTrack track) async {
+    return platform?.setSecondarySubtitleTrack(track);
+  }
+
+  /// Sets global HTTP headers used by libmpv for network sources.
+  void setMediaHeader({
+    String? userAgent,
+    String? referer,
+    Map<String, String>? headers,
+  }) {
+    platform?.setMediaHeader(
+      userAgent: userAgent,
+      referer: referer,
+      headers: headers,
+    );
+  }
+
   /// Takes the snapshot of the current video frame & returns encoded image bytes as [Uint8List].
   ///
   /// The [format] parameter specifies the format of the image to be returned. Supported values are:
@@ -315,9 +332,10 @@ class Player {
   /// On the native backend, if [includeLibassSubtitles] is `true` *and*
   /// [PlayerConfiguration.libass] is `true`, then the screenshot will include
   /// the on-screen subtitles. This option is ignored by the web backend.
-  Future<Uint8List?> screenshot(
-      {String? format = 'image/jpeg',
-      bool includeLibassSubtitles = false}) async {
+  Future<Uint8List?> screenshot({
+    String? format = 'image/jpeg',
+    bool includeLibassSubtitles = false,
+  }) async {
     return platform?.screenshot(
       format: format,
       includeLibassSubtitles: includeLibassSubtitles,

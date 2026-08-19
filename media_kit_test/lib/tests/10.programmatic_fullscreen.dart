@@ -9,7 +9,7 @@ import '../common/sources/sources.dart';
 import '../common/widgets.dart';
 
 class ProgrammaticFullscreen extends StatefulWidget {
-  const ProgrammaticFullscreen({super.key});
+  const ProgrammaticFullscreen({Key? key}) : super(key: key);
 
   @override
   State<ProgrammaticFullscreen> createState() => _ProgrammaticFullscreenState();

@@ -9,7 +9,7 @@ import '../common/sources/sources.dart';
 import '../common/widgets.dart';
 
 class VideoViewParametersScreen extends StatefulWidget {
-  const VideoViewParametersScreen({super.key});
+  const VideoViewParametersScreen({Key? key}) : super(key: key);
 
   @override
   State<VideoViewParametersScreen> createState() =>

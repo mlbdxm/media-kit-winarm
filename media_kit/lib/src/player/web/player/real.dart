@@ -469,7 +469,6 @@ class WebPlayer extends PlatformPlayer {
         rate: state.rate,
         pitch: state.pitch,
         playlistMode: state.playlistMode,
-        shuffle: false,
         audioDevice: state.audioDevice,
         audioDevices: state.audioDevices,
       );
@@ -509,9 +508,6 @@ class WebPlayer extends PlatformPlayer {
       // if (!playlistModeController.isClosed) {
       //   playlistModeController.add(PlaylistMode.none);
       // }
-      if (!shuffleController.isClosed) {
-        shuffleController.add(false);
-      }
       if (!audioParamsController.isClosed) {
         audioParamsController.add(const AudioParams());
       }
@@ -670,19 +666,15 @@ class WebPlayer extends PlatformPlayer {
             PlaylistMode.single,
           ].contains(_playlistMode)) {
         _index = _playlist.length - 2 < 0 ? 0 : _playlist.length - 2;
-        _playlist = _playlist.sublist(0, _playlist.length - 1);
+
         state = state.copyWith(
           // Allow playOrPause /w state.completed code-path to play the playlist again.
           completed: true,
-          playing: false,
           playlist: state.playlist.copyWith(
-            medias: _playlist,
+            medias: _playlist.sublist(0, _playlist.length - 1),
             index: _index,
           ),
         );
-        if (!playingController.isClosed) {
-          playingController.add(false);
-        }
         if (!completedController.isClosed) {
           completedController.add(true);
         }
@@ -703,12 +695,12 @@ class WebPlayer extends PlatformPlayer {
         _index = 0;
         _loadSource(_playlist[_index]);
         await play(synchronized: false);
-        _playlist = _playlist.sublist(0, _playlist.length - 1);
+
         state = state.copyWith(
           // Allow playOrPause /w state.completed code-path to play the playlist again.
           completed: true,
           playlist: state.playlist.copyWith(
-            medias: _playlist,
+            medias: _playlist.sublist(0, _playlist.length - 1),
             index: 0,
           ),
         );
@@ -1159,13 +1151,9 @@ class WebPlayer extends PlatformPlayer {
             [..._playlist],
             index: _index,
           ),
-          shuffle: shuffle,
         );
         if (!playlistController.isClosed) {
           playlistController.add(state.playlist);
-        }
-        if (!shuffleController.isClosed) {
-          shuffleController.add(shuffle);
         }
       } else if (!shuffle && _shuffle.isNotEmpty) {
         _playlist.clear();
@@ -1178,13 +1166,9 @@ class WebPlayer extends PlatformPlayer {
             [..._playlist],
             index: _index,
           ),
-          shuffle: shuffle,
         );
         if (!playlistController.isClosed) {
           playlistController.add(state.playlist);
-        }
-        if (!shuffleController.isClosed) {
-          shuffleController.add(shuffle);
         }
       }
     }

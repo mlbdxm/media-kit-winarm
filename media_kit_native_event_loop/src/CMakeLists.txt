@@ -26,6 +26,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     include_directories(
       "${LIBMPV_SRC}/include"
       "${LIBMPV_SRC}/include/mpv"
+      "${LIBMPV_SRC}/mpv"
     )
     target_link_libraries(
       ${TARGET_NAME} PRIVATE

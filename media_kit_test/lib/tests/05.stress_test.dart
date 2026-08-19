@@ -6,7 +6,7 @@ import '../common/globals.dart';
 import '../common/sources/sources.dart';
 
 class StressTestScreen extends StatefulWidget {
-  const StressTestScreen({super.key});
+  const StressTestScreen({Key? key}) : super(key: key);
 
   @override
   State<StressTestScreen> createState() => _StressTestScreenState();
